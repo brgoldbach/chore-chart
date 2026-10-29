@@ -1,0 +1,832 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chore Chart</title>
+<style>
+  :root {
+    --bg: #f4f5f7; --card: #fff; --band: #eef0f3; --text: #1c1d21; --muted: #6b6f76;
+    --line: #d9dce1; --accent: #03a9f4; --on-accent: #fff; --danger: #c62828;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #111214; --card: #1c1d20; --band: #26282c; --text: #e6e7ea; --muted: #9a9ea6;
+      --line: #33363b; --accent: #29b6f6; --on-accent: #0b1a22; --danger: #ef5350;
+    }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.4 system-ui, sans-serif; }
+  main { max-width: 960px; margin: 0 auto; padding: 16px; display: grid; gap: 16px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+  h1, h2 { margin: 0 0 12px; font-size: 20px; }
+  input, select, button, .button {
+    font: inherit; color: var(--text); background: var(--card);
+    border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; min-width: 0;
+  }
+  button, .button { cursor: pointer; text-decoration: none; }
+  .primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+  .delete { color: var(--danger); }
+  .bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .spacer { flex: 1; }
+  #status { color: var(--muted); }
+  .error { color: var(--danger) !important; }
+  .hint { color: var(--muted); font-size: 13px; margin: 12px 0 0; }
+
+  .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); overflow-x: auto; }
+  .tabs button {
+    border: 0; border-bottom: 2px solid transparent; border-radius: 0;
+    background: none; padding: 8px 12px; color: var(--muted);
+  }
+  .tabs [aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); }
+  .stack { display: grid; gap: 16px; }
+
+  .section h3 { margin: 16px 0 4px; padding: 6px 8px; font-size: 15px; background: var(--band); border-radius: 6px; }
+  .section:first-child h3 { margin-top: 0; }
+  .sheet table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  .sheet td { border-bottom: 1px solid var(--line); padding: 6px 8px 16px; vertical-align: top; }
+  .boxes { width: 156px; white-space: nowrap; }
+  .every { width: 116px; }
+  .every, .note { color: var(--muted); }
+  .note { font-size: 13px; }
+  .box {
+    position: relative; width: 22px; height: 22px; padding: 0; margin-right: 6px;
+    border: 1.5px solid var(--text); border-radius: 3px; background: none;
+    color: var(--text); font: 700 15px/1 system-ui, sans-serif;
+  }
+  .box.done::before { content: "✓"; }
+  .box[data-day]::after {
+    content: attr(data-day); position: absolute; top: 23px; left: 50%; transform: translateX(-50%);
+    font-size: 10px; font-weight: 400; color: var(--muted);
+  }
+
+  .scroll { overflow-x: auto; }
+  .grid { border-collapse: collapse; font-size: 13px; }
+  .grid th, .grid td { padding: 6px 8px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--line); }
+  .grid tr > :first-child { text-align: left; }
+  .grid .total { font-weight: 600; }
+  #calendar td { text-align: center; min-width: 2.5rem; }
+  .link { border: 0; background: none; padding: 0; color: var(--accent); font-weight: 600; }
+  .shift { border: 0; background: none; padding: 0 4px; color: var(--accent); }
+  .shift:disabled { visibility: hidden; }
+  .segmented { display: inline-flex; }
+  .segmented button { border-radius: 0; }
+  .segmented button:first-child { border-radius: 8px 0 0 8px; }
+  .segmented button:last-child { border-radius: 0 8px 8px 0; margin-left: -1px; }
+  .segmented [aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+  #calendar-filter { margin-bottom: 8px; }
+
+  .heading-bar { justify-content: space-between; margin-bottom: 8px; }
+  .heading-bar h2 { margin: 0; }
+  .chore-item {
+    display: block; width: 100%; text-align: left; padding: 10px 4px;
+    border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: none;
+  }
+  .chore-item:hover { background: var(--band); }
+  .meta { display: block; color: var(--muted); font-size: 13px; }
+
+  .list-editor { display: grid; gap: 6px; margin-bottom: 12px; max-width: 32rem; }
+  .list-editor:empty::before { content: attr(data-empty); color: var(--muted); }
+  .list-row { display: flex; gap: 4px; }
+  .list-row input { flex: 1; }
+  .list-row button { padding: 6px 9px; }
+  .filters input[type="search"] { flex: 1 1 12rem; }
+  #chore-count { margin: 8px 0 4px; }
+  .daily { columns: 3 12rem; margin: 4px 0 8px; padding-left: 24px; }
+  .printers { list-style: none; padding: 0; margin: 8px 0; }
+  .printers li { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--line); }
+  details summary { cursor: pointer; color: var(--accent); margin: 12px 0 4px; }
+
+  dialog {
+    width: min(32rem, calc(100vw - 32px)); padding: 20px;
+    border: 1px solid var(--line); border-radius: 12px; background: var(--card); color: var(--text);
+  }
+  dialog::backdrop { background: rgb(0 0 0 / 0.45); }
+  .field { display: grid; grid-template-columns: 7.5rem 1fr; align-items: center; gap: 8px; margin: 10px 0; }
+  .field > * { min-width: 0; }
+  .pair { display: flex; align-items: center; gap: 8px; }
+  .pair > * { flex: 1; width: 0; }
+  .pair > input[type="number"] { flex: 0 0 4.5rem; }
+  .people { display: flex; flex-wrap: wrap; gap: 4px 16px; }
+  .people:empty::before { content: "Add owners in Settings."; color: var(--muted); }
+  .mode { display: grid; gap: 6px; }
+  .mode select { margin-left: 4px; }
+  .actions { display: flex; gap: 8px; margin-top: 16px; }
+  @media (max-width: 480px) {
+    .field { grid-template-columns: 6rem 1fr; }
+    .sheet tr { display: grid; grid-template-columns: 1fr auto; border-bottom: 1px solid var(--line); }
+    .sheet td { border-bottom: 0; }
+    .sheet td.boxes { grid-column: 1 / -1; width: auto; padding-bottom: 14px; }
+    .every { width: auto; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-tab="sheet" aria-selected="true">Sheet</button>
+    <button role="tab" data-tab="year" aria-selected="false">Year</button>
+    <button role="tab" data-tab="chores" aria-selected="false">Chores</button>
+    <button role="tab" data-tab="settings" aria-selected="false">Settings</button>
+  </nav>
+
+  <div class="bar">
+    <input type="month" id="month" aria-label="Month">
+    <a id="open" class="button" target="_blank">Open PDF</a>
+    <button id="print" class="primary">Print now</button>
+    <span id="status" role="status"></span>
+  </div>
+
+  <section class="panel card sheet" id="tab-sheet">
+    <h1 id="sheet-title"></h1>
+    <p id="warning" class="error" hidden></p>
+    <div id="sheet-daily" class="section" hidden><h3>Daily</h3><ul id="daily-list" class="daily"></ul></div>
+    <div id="sheet-sections"></div>
+    <p id="sheet-empty" class="hint" hidden>No chores due this month.</p>
+    <p class="hint">Tap a box to check it off here. The paper sheet works without this.</p>
+  </section>
+
+  <section class="panel card" id="tab-year" hidden>
+    <div class="bar heading-bar">
+      <h2>Year ahead</h2>
+      <span class="segmented">
+        <button type="button" data-view="hours" aria-pressed="true">Hours</button>
+        <button type="button" data-view="calendar" aria-pressed="false">Calendar</button>
+      </span>
+    </div>
+    <div id="view-hours" class="scroll"><table id="year" class="grid"></table></div>
+    <div id="view-calendar" hidden>
+      <select id="calendar-filter" aria-label="Show chores of"></select>
+      <div class="scroll"><table id="calendar" class="grid"></table></div>
+    </div>
+    <p id="year-hint" class="hint"></p>
+  </section>
+
+  <section class="panel stack" id="tab-chores" hidden>
+    <div class="card">
+      <h2>Daily</h2>
+      <div id="daily" class="list-editor" data-empty="No daily chores yet."></div>
+      <form id="add-daily" class="bar">
+        <input id="daily-name" placeholder="For example: Load the dishwasher" aria-label="New daily chore"
+          maxlength="80" required>
+        <button>Add</button>
+      </form>
+      <p class="hint">Daily chores print as a list at the top of the sheet, with no boxes or owners.
+        Edit a name to change it.</p>
+    </div>
+    <div class="card">
+      <div class="bar heading-bar"><h2>Chores</h2><button id="add" class="primary">Add chore</button></div>
+      <div class="bar filters">
+        <input id="chore-search" type="search" placeholder="Search chores" aria-label="Search chores">
+        <select id="chore-owner" aria-label="Show chores of"></select>
+        <select id="chore-unit" aria-label="Repeats every">
+          <option value="">Any interval</option>
+          <option value="week">Weeks</option>
+          <option value="month">Months</option>
+          <option value="year">Years</option>
+        </select>
+        <select id="chore-sort" aria-label="Sort by">
+          <option value="name">Sort: Name</option>
+          <option value="owner">Sort: Owner</option>
+          <option value="often">Sort: Most often</option>
+          <option value="time">Sort: Most time</option>
+        </select>
+      </div>
+      <p id="chore-count" class="hint"></p>
+      <div id="chore-list"></div>
+      <p id="chore-empty" class="hint" hidden>No chores yet.</p>
+    </div>
+  </section>
+
+  <section class="panel stack" id="tab-settings" hidden>
+    <div class="card">
+      <h2>Owners</h2>
+      <div id="owners" class="list-editor" data-empty="No owners yet."></div>
+      <form id="add-owner" class="bar">
+        <input id="owner-name" placeholder="Name" aria-label="New owner" required>
+        <button>Add owner</button>
+      </form>
+      <p class="hint">Edit a name to rename the person on all their chores.</p>
+    </div>
+    <div class="card">
+      <h2>Printer</h2>
+      <p>Current printer: <strong id="printer-name"></strong></p>
+      <button id="search">Search for printers</button>
+      <ul id="printers" class="printers"></ul>
+      <details>
+        <summary>Enter an address instead</summary>
+        <form id="printer-form" class="bar">
+          <input id="printer-uri" placeholder="ipp://192.168.1.50/ipp/print" aria-label="Printer address">
+          <button>Save</button>
+        </form>
+      </details>
+      <label class="field">Paper size
+        <select id="paper-size"><option value="letter">Letter</option><option value="a4">A4</option></select>
+      </label>
+    </div>
+    <div class="card">
+      <h2>Auto-print</h2>
+      <label class="bar"><input type="checkbox" id="auto-print">
+        Print the sheet on the 1st of each month at <input type="time" id="auto-print-time" aria-label="Auto-print time"></label>
+      <p id="auto-print-status" class="hint"></p>
+    </div>
+    <div class="card">
+      <h2>Backup</h2>
+      <div class="bar">
+        <a class="button" href="api/export" download="chore-chart.json">Export chores</a>
+        <label class="button">Import chores<input type="file" id="import-file" accept=".json,application/json" hidden></label>
+      </div>
+      <p class="hint">The file holds your owners, daily chores, and chores. Import replaces them.</p>
+    </div>
+  </section>
+</main>
+
+<dialog id="chore-dialog">
+  <form id="chore-form">
+    <h2 id="dialog-title"></h2>
+    <label class="field">Chore <input id="f-name" required maxlength="80"></label>
+    <div class="field"><span>Owners</span><div id="f-people" class="people"></div></div>
+    <div class="field" id="f-mode-row"><span></span>
+      <div class="mode">
+        <label><input type="radio" name="mode" id="f-turns"> Take turns, starting with
+          <select id="f-start" aria-label="Starting with"></select></label>
+        <label><input type="radio" name="mode" id="f-shared"> Shared (time split evenly)</label>
+      </div>
+    </div>
+    <div class="field"><span>Every</span>
+      <span class="pair">
+        <input id="f-every" type="number" min="1" aria-label="Every">
+        <select id="f-unit" aria-label="Unit">
+          <option value="week">weeks</option>
+          <option value="month">months</option>
+          <option value="year">years</option>
+        </select>
+      </span>
+    </div>
+    <label class="field" id="f-day-row">Day <select id="f-day"></select></label>
+    <label class="field">Aligned to <input id="f-align" type="month" required></label>
+    <label class="field">Minutes <input id="f-minutes" type="number" min="0" placeholder="Optional"></label>
+    <details id="more">
+      <summary>More</summary>
+      <div class="field"><span>Season</span>
+        <span class="pair">
+          <select id="f-season-from" aria-label="Season start"></select> to
+          <select id="f-season-to" aria-label="Season end"></select>
+        </span>
+      </div>
+      <label class="field">Note <input id="f-note" maxlength="80" placeholder="Optional"></label>
+    </details>
+    <p class="hint">Aligned to: any month the chore is due. Earlier and later months follow the same rhythm.</p>
+    <p id="f-error" class="error"></p>
+    <div class="actions">
+      <button type="button" id="f-delete" class="delete">Delete</button>
+      <button type="button" id="f-duplicate">Duplicate</button>
+      <span class="spacer"></span>
+      <button type="button" id="f-cancel">Cancel</button>
+      <button class="primary">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<script type="module">
+const $ = (id) => document.getElementById(id);
+const JSON_HEADERS = { "Content-Type": "application/json" };
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+// Owner names are trimmed, so a leading space never clashes with one.
+const SHARED_FILTER = " shared";
+const NO_OWNER_FILTER = " none";
+// Same approximations as UNIT_DAYS in schedule.py, for time per month and "most often".
+const UNIT_DAYS = { week: 7, month: 30, year: 365 };
+const intervalDays = (chore) => chore.every * UNIT_DAYS[chore.unit];
+const monthlyMinutes = (chore) => ((chore.minutes || 0) * 30) / intervalDays(chore);
+const byName = (a, b) => a.name.localeCompare(b.name);
+const CHORE_SORTS = {
+  name: byName,
+  owner: (a, b) => ownerRank(a) - ownerRank(b) || byName(a, b),
+  often: (a, b) => intervalDays(a) - intervalDays(b) || byName(a, b),
+  time: (a, b) => monthlyMinutes(b) - monthlyMinutes(a) || byName(a, b),
+};
+const YEAR_HINTS = {
+  hours: "Hours per person, from the time estimates. Tap a month to open its sheet. Tap a person to see their chores.",
+  calendar: "Who does each chore, month by month. ◀ ▶ move a chore by one month. Tap a chore to edit it.",
+};
+let chores = [];
+let owners = [];
+let daily = [];
+let settings = {};
+let year = null;
+let editing = null;
+
+function el(tag, props = {}, ...children) {
+  const node = Object.assign(document.createElement(tag), props);
+  node.append(...children);
+  return node;
+}
+
+function currentMonth() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function addMonths(text, count) {
+  const total = Number(text.slice(0, 4)) * 12 + Number(text.slice(5)) - 1 + count;
+  return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, "0")}`;
+}
+
+const month = () => $("month").value || currentMonth();
+const monthLabel = (text) => `${MONTHS[Number(text.slice(5)) - 1]} ${text.slice(0, 4)}`;
+
+async function api(path, options) {
+  const response = await fetch(path, options);
+  const body = await response.json();
+  if (!response.ok) throw new Error(body.error);
+  return body;
+}
+
+function setStatus(text, isError = false) {
+  $("status").textContent = text;
+  $("status").classList.toggle("error", isError);
+}
+
+function showTab(name) {
+  for (const tab of document.querySelectorAll("[data-tab]")) {
+    tab.setAttribute("aria-selected", tab.dataset.tab === name);
+  }
+  for (const panel of document.querySelectorAll(".panel")) panel.hidden = panel.id !== `tab-${name}`;
+}
+
+function refreshViews() {
+  refreshSheet();
+  refreshYear();
+}
+
+function boxButton(row, box) {
+  const button = el("button", { type: "button", className: "box",
+    ariaLabel: box.day ? `${row.name}, ${box.key}` : row.name });
+  if (box.day) button.dataset.day = box.day;
+  const show = () => {
+    button.classList.toggle("done", box.done);
+    button.setAttribute("aria-pressed", box.done);
+  };
+  show();
+  button.addEventListener("click", async () => {
+    box.done = !box.done;
+    show();
+    try {
+      await api("api/done", { method: "POST", headers: JSON_HEADERS,
+        body: JSON.stringify({ id: row.id, key: box.key, done: box.done }) });
+    } catch (error) {
+      box.done = !box.done;
+      show();
+      setStatus(`Check-off failed: ${error.message}`, true);
+    }
+  });
+  return button;
+}
+
+function sheetSection(section) {
+  const rows = section.rows.map((row) => el("tr", {},
+    el("td", { className: "boxes" }, ...row.boxes.map((box) => boxButton(row, box))),
+    el("td", {}, row.name, row.note ? el("div", { className: "note", textContent: row.note }) : ""),
+    el("td", { className: "every", textContent: row.every })));
+  return el("div", { className: "section" }, el("h3", { textContent: section.label }), el("table", {}, ...rows));
+}
+
+async function refreshSheet() {
+  $("open").href = `sheet.pdf?month=${month()}`;
+  const due = await api(`api/due?month=${month()}`);
+  // The printout keeps empty sections for write-ins; the screen leaves them out.
+  const sections = due.sections.filter((section) => section.rows.length);
+  $("sheet-title").textContent = due.title;
+  $("sheet-daily").hidden = due.daily.length === 0;
+  $("daily-list").replaceChildren(...due.daily.map((name) => el("li", { textContent: name })));
+  $("sheet-sections").replaceChildren(...sections.map(sheetSection));
+  $("sheet-empty").hidden = sections.length > 0;
+  $("warning").hidden = due.pages === 1;
+  $("warning").textContent = `Too many chores for one page: the sheet runs to ${due.pages} pages.`;
+}
+
+async function refreshYear() {
+  year = await api(`api/year?month=${month()}`);
+  renderHours();
+  renderCalendar();
+}
+
+function monthHeader() {
+  return year.months.map((column) => el("th", {}, el("button", {
+    type: "button", className: "link", textContent: column.label, onclick: () => openSheet(column.month) })));
+}
+
+function renderHours() {
+  const most = Math.max(1, ...year.hours.flatMap((row) => row.cells.map((cell) => cell.minutes)));
+  const heatCell = (cell) => {
+    const td = el("td", { textContent: cell.label });
+    if (cell.minutes) {
+      td.style.background = `color-mix(in srgb, var(--accent) ${Math.round((cell.minutes / most) * 45)}%, transparent)`;
+    }
+    return td;
+  };
+  $("year").replaceChildren(
+    el("tr", {}, el("th"), ...monthHeader(), el("th", { textContent: "Year" })),
+    ...year.hours.map((row) => el("tr", {},
+      el("th", {}, row.owner ? el("button", { type: "button", className: "link", textContent: row.label,
+        onclick: () => openCalendar(row.owner) }) : row.label),
+      ...row.cells.map(heatCell), el("td", { className: "total", textContent: row.total.label }))),
+    el("tr", { className: "total" }, el("th", { textContent: "Total" }),
+      ...year.totals.map((cell) => el("td", { textContent: cell.label })), el("td", { textContent: year.total.label })));
+}
+
+function renderCalendar() {
+  const filter = $("calendar-filter");
+  const chosen = filter.value;
+  const options = [["", "All people"], ...owners.map((owner) => [owner, owner])];
+  if (owners.length > 1) options.push([SHARED_FILTER, "Shared"]);
+  fillSelect(filter, options, options.some(([value]) => value === chosen) ? chosen : "");
+
+  const rows = year.calendar.filter((row) => !filter.value
+    || (filter.value === SHARED_FILTER ? row.shared : row.people.includes(filter.value)));
+  $("calendar").replaceChildren(
+    el("tr", {}, el("th"), ...monthHeader()),
+    ...rows.map((row) => {
+      const chore = chores.find((item) => item.id === row.id);
+      const shift = (text, offset) => el("button", { type: "button", className: "shift", textContent: text,
+        ariaLabel: `Move ${row.name} ${offset < 0 ? "earlier" : "later"}`, disabled: !row.movable,
+        onclick: () => moveChore(chore, addMonths(chore.align, offset)) });
+      return el("tr", {},
+        el("th", {}, shift("◀", -1),
+          el("button", { type: "button", className: "link", textContent: row.name, onclick: () => openChore(chore) }),
+          shift("▶", 1)),
+        ...row.cells.map((text) => el("td", { textContent: text })));
+    }));
+}
+
+function showYearView(view) {
+  for (const button of document.querySelectorAll("[data-view]")) {
+    button.setAttribute("aria-pressed", button.dataset.view === view);
+  }
+  $("view-hours").hidden = view !== "hours";
+  $("view-calendar").hidden = view !== "calendar";
+  $("year-hint").textContent = YEAR_HINTS[view];
+}
+
+function openCalendar(person) {
+  $("calendar-filter").value = person;
+  renderCalendar();
+  showYearView("calendar");
+}
+
+function openSheet(value) {
+  $("month").value = value;
+  refreshViews();
+  showTab("sheet");
+}
+
+async function putChores(next) {
+  chores = await api("api/chores", { method: "PUT", headers: JSON_HEADERS, body: JSON.stringify(next) });
+  renderChores();
+  refreshViews();
+}
+
+async function moveChore(chore, align) {
+  try {
+    await putChores(chores.map((item) => (item === chore ? { ...item, align } : item)));
+    setStatus(`Moved ${chore.name} to ${monthLabel(align)}.`);
+  } catch (error) {
+    setStatus(`Move failed: ${error.message}`, true);
+  }
+}
+
+for (const button of document.querySelectorAll("[data-view]")) {
+  button.addEventListener("click", () => showYearView(button.dataset.view));
+}
+$("calendar-filter").addEventListener("change", renderCalendar);
+
+function choreSummary(chore) {
+  const interval = chore.every === 1 ? chore.unit : `${chore.every} ${chore.unit}s`;
+  const day = chore.weekday === null ? "" : ` on ${DAYS[chore.weekday].slice(0, 3)}`;
+  const who = chore.owners.join(chore.shared ? " + " : " ⇄ ") || "No owner";
+  const parts = [who, `every ${interval}${day}`, `aligned ${monthLabel(chore.align)}`];
+  if (chore.minutes) parts.push(`${chore.minutes} min each`, `≈ ${roughDuration(monthlyMinutes(chore))} a month`);
+  if (chore.season) parts.push(chore.season.map((number) => MONTHS[number - 1]).join("–"));
+  if (chore.note) parts.push("note");
+  return parts.join(" · ");
+}
+
+function roughDuration(minutes) {
+  const rounded = Math.max(5, Math.round(minutes / 5) * 5);
+  const hours = Math.floor(rounded / 60);
+  return [hours ? `${hours} h` : "", rounded % 60 ? `${rounded % 60} m` : ""].filter(Boolean).join(" ");
+}
+
+function ownerRank(chore) {
+  // Owners-list order; chores without an owner go last.
+  return chore.owners.length ? owners.indexOf(chore.owners[0]) : owners.length;
+}
+
+function matchesFilters(chore) {
+  const query = $("chore-search").value.trim().toLowerCase();
+  const owner = $("chore-owner").value;
+  const unit = $("chore-unit").value;
+  return (!query || `${chore.name} ${chore.note}`.toLowerCase().includes(query))
+    && (!unit || chore.unit === unit)
+    && (!owner || (owner === SHARED_FILTER ? chore.shared
+      : owner === NO_OWNER_FILTER ? !chore.owners.length : chore.owners.includes(owner)));
+}
+
+function renderChores() {
+  const filter = $("chore-owner");
+  const options = [["", "All people"], ...owners.map((owner) => [owner, owner])];
+  if (owners.length > 1) options.push([SHARED_FILTER, "Shared"]);
+  options.push([NO_OWNER_FILTER, "No owner"]);
+  fillSelect(filter, options, options.some(([value]) => value === filter.value) ? filter.value : "");
+
+  const shown = chores.filter(matchesFilters).sort(CHORE_SORTS[$("chore-sort").value]);
+  $("chore-list").replaceChildren(...shown.map((chore) => el("button",
+    { type: "button", className: "chore-item", onclick: () => openChore(chore) },
+    el("strong", { textContent: chore.name }), el("span", { className: "meta", textContent: choreSummary(chore) }))));
+  $("chore-count").textContent = shown.length === chores.length ? `${chores.length} chores`
+    : `Showing ${shown.length} of ${chores.length} chores`;
+  $("chore-empty").hidden = shown.length > 0;
+  $("chore-empty").textContent = chores.length ? "No chores match." : "No chores yet.";
+}
+
+$("chore-search").addEventListener("input", renderChores);
+for (const id of ["chore-owner", "chore-unit", "chore-sort"]) $(id).addEventListener("change", renderChores);
+
+function fillSelect(select, options, value) {
+  select.replaceChildren(...options.map(([optionValue, text]) => new Option(text, optionValue)));
+  select.value = value;
+}
+
+function checkedPeople() {
+  return [...$("f-people").querySelectorAll("input:checked")].map((input) => input.value);
+}
+
+function syncMode() {
+  const people = checkedPeople();
+  const start = $("f-start").value;
+  $("f-mode-row").hidden = people.length < 2;
+  fillSelect($("f-start"), people.map((person) => [person, person]), people.includes(start) ? start : people[0] ?? "");
+  $("f-start").disabled = $("f-shared").checked;
+}
+
+function syncSeason() {
+  $("f-season-to").disabled = !$("f-season-from").value;
+}
+
+function syncUnit() {
+  $("f-day-row").hidden = $("f-unit").value !== "week";
+}
+
+function openChore(chore, values = chore ?? { name: "", owners: [], shared: false, every: 1, unit: "month",
+  weekday: null, align: month(), minutes: null, season: null, note: "" }) {
+  editing = chore;
+  const monthOptions = MONTHS.map((name, index) => [index + 1, name]);
+  $("dialog-title").textContent = chore ? "Edit chore" : "Add chore";
+  $("f-name").value = values.name;
+  $("f-people").replaceChildren(...owners.map((owner) => el("label", {},
+    el("input", { type: "checkbox", value: owner, checked: values.owners.includes(owner), onchange: syncMode }),
+    ` ${owner}`)));
+  $("f-shared").checked = values.shared;
+  $("f-turns").checked = !values.shared;
+  fillSelect($("f-start"), [], "");
+  syncMode();
+  $("f-start").value = values.owners[0] ?? "";
+  $("f-every").value = values.every;
+  $("f-unit").value = values.unit;
+  fillSelect($("f-day"), [["", "Any day"], ...DAYS.map((name, index) => [index, name])], values.weekday ?? "");
+  syncUnit();
+  $("f-align").value = values.align;
+  $("f-minutes").value = values.minutes ?? "";
+  fillSelect($("f-season-from"), [["", "Any"], ...monthOptions], values.season?.[0] ?? "");
+  fillSelect($("f-season-to"), monthOptions, values.season?.[1] ?? 12);
+  syncSeason();
+  $("f-note").value = values.note;
+  $("more").open = Boolean(values.season || values.note);
+  $("f-delete").hidden = $("f-duplicate").hidden = !chore;
+  $("f-error").textContent = "";
+  if (!$("chore-dialog").open) $("chore-dialog").showModal();
+  $("f-name").focus();
+}
+
+async function saveFromDialog(next) {
+  try {
+    await putChores(next);
+  } catch (error) {
+    $("f-error").textContent = error.message;
+    return;
+  }
+  $("chore-dialog").close();
+  setStatus("Saved.");
+}
+
+$("chore-form").addEventListener("submit", (event) => {
+  event.preventDefault();
+  const people = checkedPeople();
+  const shared = people.length > 1 && $("f-shared").checked;
+  const start = people.includes($("f-start").value) ? $("f-start").value : people[0];
+  const from = Number($("f-season-from").value);
+  const chore = {
+    id: editing?.id,
+    name: $("f-name").value,
+    owners: people.length ? [start, ...people.filter((person) => person !== start)] : [],
+    shared,
+    every: Math.max(1, parseInt($("f-every").value) || 1),
+    unit: $("f-unit").value,
+    weekday: $("f-unit").value === "week" && $("f-day").value !== "" ? Number($("f-day").value) : null,
+    align: $("f-align").value,
+    minutes: parseInt($("f-minutes").value) || null,
+    season: from ? [from, Number($("f-season-to").value)] : null,
+    note: $("f-note").value,
+  };
+  saveFromDialog(editing ? chores.map((item) => (item === editing ? chore : item)) : [...chores, chore]);
+});
+
+$("f-delete").addEventListener("click", () => {
+  if (confirm(`Delete "${editing.name}"?`)) saveFromDialog(chores.filter((item) => item !== editing));
+});
+$("f-duplicate").addEventListener("click", () => openChore(null, { ...editing, name: `${editing.name} (copy)` }));
+$("f-cancel").addEventListener("click", () => $("chore-dialog").close());
+$("f-turns").addEventListener("change", syncMode);
+$("f-shared").addEventListener("change", syncMode);
+$("f-season-from").addEventListener("change", syncSeason);
+$("f-unit").addEventListener("change", syncUnit);
+$("add").addEventListener("click", () => openChore(null));
+
+function listEditor(container, items, { label, rename, save }) {
+  container.replaceChildren(...items.map((item, index) => {
+    const input = el("input", { value: item, maxLength: 80, ariaLabel: `${label}: ${item}`,
+      onchange: () => rename(index, input.value) });
+    return el("div", { className: "list-row" }, input,
+      el("button", { type: "button", className: "delete", textContent: "✕", ariaLabel: `Remove ${item}`,
+        onclick: () => save(items.filter((_, other) => other !== index)) }));
+  }));
+}
+
+function renderOwners() {
+  listEditor($("owners"), owners, { label: "Owner", save: saveOwners, rename: renameOwner });
+}
+
+function renderDaily() {
+  listEditor($("daily"), daily, { label: "Daily chore", save: saveDaily,
+    rename: (index, name) => saveDaily(daily.map((item, other) => (other === index ? name : item))) });
+}
+
+async function saveDaily(next) {
+  let saved = true;
+  try {
+    daily = await api("api/daily", { method: "PUT", headers: JSON_HEADERS, body: JSON.stringify(next) });
+    setStatus("Saved.");
+  } catch (error) {
+    setStatus(`Save failed: ${error.message}`, true);
+    saved = false;
+  }
+  // Render either way, so a rejected edit shows the saved name again.
+  renderDaily();
+  refreshSheet();
+  return saved;
+}
+
+$("add-daily").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (await saveDaily([...daily, $("daily-name").value])) $("daily-name").value = "";
+});
+
+async function saveOwners(next) {
+  let saved = true;
+  try {
+    owners = await api("api/owners", { method: "PUT", headers: JSON_HEADERS, body: JSON.stringify(next) });
+    setStatus("Saved.");
+  } catch (error) {
+    setStatus(`Save failed: ${error.message}`, true);
+    saved = false;
+  }
+  renderOwners();
+  refreshViews();
+  return saved;
+}
+
+async function renameOwner(index, name) {
+  try {
+    ({ owners, chores } = await api("api/owners/rename", { method: "POST", headers: JSON_HEADERS,
+      body: JSON.stringify({ from: owners[index], to: name }) }));
+    setStatus("Renamed.");
+  } catch (error) {
+    setStatus(`Rename failed: ${error.message}`, true);
+  }
+  renderOwners();
+  renderChores();
+  refreshViews();
+}
+
+$("add-owner").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (await saveOwners([...owners, $("owner-name").value])) $("owner-name").value = "";
+});
+
+function renderSettings() {
+  $("printer-name").textContent = settings.printer_name || settings.printer_uri || "None";
+  $("printer-uri").value = settings.printer_uri;
+  $("paper-size").value = settings.paper_size;
+  $("auto-print").checked = settings.auto_print;
+  $("auto-print-time").value = settings.auto_print_time;
+  $("auto-print-status").textContent = settings.auto_print_status;
+}
+
+async function saveSettings(changes) {
+  try {
+    settings = await api("api/settings", { method: "PUT", headers: JSON_HEADERS, body: JSON.stringify(changes) });
+    setStatus("Saved.");
+  } catch (error) {
+    setStatus(`Save failed: ${error.message}`, true);
+  }
+  renderSettings();
+}
+
+$("search").addEventListener("click", async () => {
+  $("search").disabled = true;
+  setStatus("Searching…");
+  try {
+    const found = await api("api/printers");
+    $("printers").replaceChildren(...found.map((printer) => el("li", {},
+      el("span", { textContent: printer.model && printer.model !== printer.name ? `${printer.name} — ${printer.model}` : printer.name }),
+      el("button", { type: "button", textContent: "Use",
+        onclick: () => saveSettings({ printer_name: printer.name, printer_uri: printer.uri }) }))));
+    setStatus(found.length ? `Found ${found.length} printer${found.length === 1 ? "" : "s"}.` : "No printers found.");
+  } catch (error) {
+    setStatus(`Search failed: ${error.message}`, true);
+  }
+  $("search").disabled = false;
+});
+
+$("printer-form").addEventListener("submit", (event) => {
+  event.preventDefault();
+  saveSettings({ printer_name: "", printer_uri: $("printer-uri").value });
+});
+$("paper-size").addEventListener("change", async () => {
+  await saveSettings({ paper_size: $("paper-size").value });
+  refreshSheet();
+});
+$("auto-print").addEventListener("change", () => saveSettings({ auto_print: $("auto-print").checked }));
+$("auto-print-time").addEventListener("change", () => saveSettings({ auto_print_time: $("auto-print-time").value }));
+
+$("import-file").addEventListener("change", async () => {
+  const file = $("import-file").files[0];
+  $("import-file").value = "";
+  if (!file) return;
+  let data;
+  try {
+    data = JSON.parse(await file.text());
+  } catch {
+    setStatus("Import failed: the file is not JSON.", true);
+    return;
+  }
+  const count = (list) => (Array.isArray(list) ? list.length : 0);
+  // A file from before the daily list existed keeps the current daily chores.
+  const hasDaily = Array.isArray(data.daily);
+  if (!confirm(`Replace your ${chores.length} chores, ${owners.length} owners`
+    + `${hasDaily ? `, and ${daily.length} daily chores` : ""} with the file's ${count(data.chores)} chores, `
+    + `${count(data.owners)} owners${hasDaily ? `, and ${data.daily.length} daily chores` : ""}?`)) return;
+  try {
+    ({ owners, daily, chores } = await api("api/import", { method: "POST", headers: JSON_HEADERS,
+      body: JSON.stringify(data) }));
+  } catch (error) {
+    setStatus(`Import failed: ${error.message}`, true);
+    return;
+  }
+  setStatus(`Imported ${chores.length} chores, ${owners.length} owners, and ${daily.length} daily chores.`);
+  renderOwners();
+  renderDaily();
+  renderChores();
+  refreshViews();
+});
+
+$("print").addEventListener("click", async () => {
+  $("print").disabled = true;
+  setStatus("Printing…");
+  try {
+    setStatus((await api(`api/print?month=${month()}`, { method: "POST" })).message);
+  } catch (error) {
+    setStatus(`Print failed: ${error.message}`, true);
+  }
+  $("print").disabled = false;
+});
+
+for (const tab of document.querySelectorAll("[data-tab]")) {
+  tab.addEventListener("click", () => showTab(tab.dataset.tab));
+}
+$("month").value = currentMonth();
+$("month").addEventListener("change", refreshViews);
+showYearView("hours");
+[owners, daily, chores, settings] = await Promise.all(
+  [api("api/owners"), api("api/daily"), api("api/chores"), api("api/settings")]);
+renderOwners();
+renderDaily();
+renderChores();
+renderSettings();
+refreshViews();
+</script>
+</body>
+</html>
