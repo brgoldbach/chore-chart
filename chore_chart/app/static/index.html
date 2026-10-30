@@ -505,8 +505,9 @@ function sheetSection(section) {
   return el("div", { className: "section" }, el("h3", { textContent: section.label }), el("table", {}, ...rows));
 }
 
-// Page shows the printed sheet itself, drawn as SVG; List is the reflowing view for small screens.
-let sheetView = "page";
+// Page shows the printed sheet itself, drawn as SVG. On a phone its boxes are too small to tap,
+// so narrow screens open in List, which reflows.
+let sheetView = matchMedia("(max-width: 600px)").matches ? "list" : "page";
 
 function showSheetView(view) {
   sheetView = view;
@@ -515,7 +516,6 @@ function showSheetView(view) {
   }
   $("sheet-page").hidden = view !== "page";
   $("sheet-list").hidden = view !== "list";
-  refreshSheet();
 }
 
 async function refreshSheetPage() {
@@ -543,7 +543,10 @@ $("sheet-page").addEventListener("click", async (event) => {
 });
 
 for (const button of document.querySelectorAll("[data-sheet-view]")) {
-  button.addEventListener("click", () => showSheetView(button.dataset.sheetView));
+  button.addEventListener("click", () => {
+    showSheetView(button.dataset.sheetView);
+    refreshSheet();
+  });
 }
 
 async function refreshSheet() {
@@ -1065,6 +1068,7 @@ for (const tab of document.querySelectorAll("[data-tab]")) {
 $("month").value = currentMonth();
 $("month").addEventListener("change", refreshViews);
 showYearView("hours");
+showSheetView(sheetView);
 [owners, daily, chores, settings, printout] = await Promise.all(
   [api("api/owners"), api("api/daily"), api("api/chores"), api("api/settings"), api("api/printout")]);
 renderOwners();

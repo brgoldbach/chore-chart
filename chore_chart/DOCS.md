@@ -100,7 +100,7 @@ The printout has two styles. You choose one on the **Settings** tab, under **Pri
 - **Full month:** the text shrinks, down to 8 pt. Past that, **Fit to one page** gives up more (see the options table). If the month still does not fit, a section continues on the next page under "Name (cont.)", and the app shows a warning.
 - **Rows:** every row has the same height and ends in the same line, whether it holds a chore or is a write-in. With shaded rows, the shading takes the place of the lines. So the rows of cards side by side line up. Names and boxes centre in each row. A note goes below its name, and a day number below its box.
 - **One-page capacity:** for 3 people, Cards holds about 42 chores (90 with 3 cards per row). Week grid holds about 21 (12 in landscape).
-- The **Sheet** tab has two views. **Page** shows the printed page itself, drawn from the same layout as the PDF. **List** shows the chores as a list, without the empty sections, which suits a phone screen better.
+- The **Sheet** tab has two views. **Page** shows the printed page itself, drawn from the same layout as the PDF. **List** shows the chores as a list, without the empty sections. On a screen 600 px wide or narrower, such as a phone, the tab opens in List, because the page's boxes are too small to tap there.
 - In either view, tap a box to check it off. The ✓ shows at once and saves in the background. A reprint shows checked boxes with ✓. The paper sheet works without this.
 - Each corner of the printout has a small decoration that changes with the month. The title and headings take the theme's color. The decoration stays in the margin, and it prints as light gray on a black-and-white printer.
 
