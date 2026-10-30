@@ -8,6 +8,7 @@
 - Every row has the same height and ends in the same line, chore or write-in, so the cards side by side line up.
 - Each person's printout color can be picked under Owners.
 - Fit to one page (on by default): a full month gives up write-in lines, then empty sections, then text size, before it runs onto page 2.
+- The Sheet tab shows the printed page itself (Page view), and a tap on a box checks it off at once. List shows the chores as before.
 - Export and import include the printout options, saved layouts, and owner colors.
 
 ## 1.0.0

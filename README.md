@@ -15,7 +15,7 @@ A Home Assistant app for household chores. Keep the chore list in Home Assistant
 - Built-in layouts, and your own saved ones: text size, a color you pick for each person, box style, landscape, a custom title, and more.
 - Fit to one page: a full month gives up write-in lines, then smaller text, before it runs onto page 2.
 - Corner decorations for each season and for Easter, the 4th of July, Halloween, Thanksgiving, and Christmas.
-- On-screen check-off, a year view of each person's hours, and a chore calendar.
+- The Sheet tab shows the printed page itself, with on-screen check-off; also a year view of each person's hours, and a chore calendar.
 - Printer search (AirPrint, IPP Everywhere, Mopria) and auto-print on the 1st of each month.
 - Export and import of all chores as a JSON file.
 

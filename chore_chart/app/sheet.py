@@ -1,10 +1,12 @@
 """Printable chore sheet in two styles: Cards (a card per person) and Week grid (a column per week).
 
+The same drawing also comes out as SVG pages, so the Sheet tab shows the printed page (Sheet.svg_pages).
 Units are inches; font sizes are points.
 Related Documentation: DOCS.md ("The sheet").
 """
 
 from calendar import monthrange
+from html import escape
 from math import ceil
 
 from fpdf import FPDF
@@ -34,6 +36,8 @@ TEXT_SIZES = {"small": 0.9, "normal": 1.15, "large": 1.35}
 FONTS = {"sans": ("DejaVuSans", "DejaVuSans-Bold", "DejaVuSans-Oblique"),
          "serif": ("DejaVuSerif", "DejaVuSerif-Bold", "DejaVuSerif-Italic"),
          "condensed": ("DejaVuSansCondensed", "DejaVuSansCondensed-Bold", "DejaVuSansCondensed-Oblique")}
+# The same families by name, for the SVG pages that a browser draws (the app serves the font files).
+SVG_FAMILIES = {"sans": "DejaVu Sans", "serif": "DejaVu Serif", "condensed": "DejaVu Sans Condensed"}
 
 # Each option's default and allowed values; None allows any value of the default's type.
 PRINTOUT_OPTIONS = {
@@ -152,7 +156,9 @@ def printed_sections(sections, options, colors):
             if not color:
                 color, automatic = free[automatic % len(free)], automatic + 1
         if section["rows"] or options["show_empty"]:
-            printed.append({**section, "color": PERSON_COLORS[color] if color else None,
+            # Each box carries its chore's id, so the screen copy of the page can check it off.
+            rows = [{**row, "boxes": [{**item, "id": row["id"]} for item in row["boxes"]]} for row in section["rows"]]
+            printed.append({**section, "rows": rows, "color": PERSON_COLORS[color] if color else None,
                             "minutes": section["minutes"] if options["show_times"] else 0})
     return printed
 
@@ -161,6 +167,14 @@ def week_spans(month):
     """Return the Week grid's columns for `month`: (first day, last day) of each 7 days from the 1st."""
     days = monthrange(month.year, month.month)[1]
     return [(start, min(start + 6, days)) for start in range(1, days + 1, 7)]
+
+
+def hex_color(rgb):
+    return "#%02x%02x%02x" % tuple(rgb)
+
+
+def svg_color(color):
+    return hex_color(round(value * 255) for value in color.colors)
 
 
 def tint(color):
@@ -196,6 +210,8 @@ class Sheet(FPDF):
         for style, file in zip(("", "B", "I"), FONTS[options["font"]]):
             self.add_font("Body", style, f"{FONT_DIR}/{file}.ttf")
         self.month, self.sections, self.options = month, sections, options
+        # Each page's drawing as SVG elements, and a target over each chore's box: see svg_pages.
+        self.drawn, self.targets = [], []
         # Shaded rows mark themselves, so the line under each row is drawn only without shading.
         self.lined = not options["shading"]
         self.daily = [] if options["daily"] == "hidden" else daily
@@ -209,6 +225,76 @@ class Sheet(FPDF):
         self.body_top = self.title_top + 0.69
         self.bottom = self.h - MARGIN
         self.set_scale(1)
+
+    def svg_pages(self):
+        """Return each page as an SVG document: the same drawing as the PDF, in inches.
+
+        Each chore's box gets a group with class "target" and data-id, data-key, and data-done:
+        a transparent rect as wide as the box pitch, and the check mark, shown only when done.
+        The screen flips the check at once on a tap, without drawing the page again.
+        """
+        family = SVG_FAMILIES[self.options["font"]]
+        pages = []
+        for page, elements in enumerate(self.drawn):
+            targets = "".join(self.svg_target(*target) for on_page, *target in self.targets if on_page == page)
+            pages.append(f'<svg xmlns="http://www.w3.org/2000/svg" class="page" '
+                         f'viewBox="0 0 {self.w:.4f} {self.h:.4f}" font-family="{family}" style="font-kerning: none">'
+                         f'<rect width="{self.w:.4f}" height="{self.h:.4f}" fill="#fff"/>{"".join(elements)}{targets}'
+                         f'</svg>')
+        return pages
+
+    def svg_target(self, x, y, size, check, width, chore, key, done):
+        points = " ".join(f"{px:.4f},{py:.4f}" for px, py in check)
+        return (f'<g class="target" data-id="{escape(chore)}" data-key="{escape(key)}" data-done="{str(done).lower()}">'
+                f'<rect x="{x:.4f}" y="{y:.4f}" width="{size:.4f}" height="{size:.4f}" fill="transparent"/>'
+                f'<polyline class="check" points="{points}" fill="none" stroke="{hex_color(INK)}" '
+                f'stroke-width="{width:.4f}" visibility="{"visible" if done else "hidden"}"/></g>')
+
+    # Each drawing call below also goes into self.drawn as SVG. fpdf's polygon draws through polyline,
+    # and its circle through ellipse, so those two are not overridden.
+    def add_page(self, *args, **kwargs):
+        self.drawn.append([])
+        super().add_page(*args, **kwargs)
+
+    def rect(self, x, y, w, h, style=None, round_corners=False, corner_radius=0):
+        super().rect(x, y, w, h, style=style, round_corners=round_corners, corner_radius=corner_radius)
+        corner = f' rx="{corner_radius:.4f}"' if round_corners else ""
+        self.record(f'<rect x="{x:.4f}" y="{y:.4f}" width="{w:.4f}" height="{h:.4f}"{corner}', style)
+
+    def line(self, x1, y1, x2, y2):
+        super().line(x1, y1, x2, y2)
+        self.record(f'<line x1="{x1:.4f}" y1="{y1:.4f}" x2="{x2:.4f}" y2="{y2:.4f}"', "D")
+
+    def polyline(self, point_list, fill=False, polygon=False, style=None):
+        super().polyline(point_list, fill=fill, polygon=polygon, style=style)
+        points = " ".join(f"{x:.4f},{y:.4f}" for x, y in point_list)
+        self.record(f'<{"polygon" if polygon else "polyline"} points="{points}"', style or ("F" if fill else "D"))
+
+    def ellipse(self, x, y, w, h, style=None):
+        super().ellipse(x, y, w, h, style=style)
+        self.record(f'<ellipse cx="{x + w / 2:.4f}" cy="{y + h / 2:.4f}" rx="{w / 2:.4f}" ry="{h / 2:.4f}"', style)
+
+    def cell(self, w=None, h=None, text="", *args, **kwargs):
+        # fpdf sets the baseline 0.3 font sizes below the middle of the cell, after the cell margin.
+        x, y = self.x, self.y
+        result = super().cell(w, h, text, *args, **kwargs)
+        if text:
+            align = getattr(kwargs.get("align", "L"), "value", kwargs.get("align", "L"))
+            anchor, text_x = {"C": ("middle", x + w / 2), "R": ("end", x + w - self.c_margin)}.get(
+                align, ("start", x + self.c_margin))
+            weight = ' font-weight="bold"' if "B" in self.font_style else ""
+            slant = ' font-style="italic"' if "I" in self.font_style else ""
+            baseline = y + 0.5 * h + 0.3 * self.font_size
+            self.drawn[-1].append(
+                f'<text x="{text_x:.4f}" y="{baseline:.4f}" text-anchor="{anchor}" font-size="{self.font_size:.4f}"'
+                f'{weight}{slant} fill="{svg_color(self.text_color)}">{escape(text)}</text>')
+        return result
+
+    def record(self, element, style):
+        style = str(getattr(style, "value", style) or "D")
+        fill = svg_color(self.fill_color) if "F" in style else "none"
+        stroke = f' stroke="{svg_color(self.draw_color)}" stroke-width="{self.line_width:.4f}"' if "D" in style else ""
+        self.drawn[-1].append(f'{element} fill="{fill}"{stroke}/>')
 
     def set_scale(self, scale):
         self.scale = scale
@@ -365,11 +451,17 @@ class Sheet(FPDF):
         else:
             self.rect(x, y, size, size, round_corners=self.options["box_style"] == "rounded",
                       corner_radius=0.03 * scale)
+        # Drawn, not typed: DejaVu Serif Bold has no ✓ glyph.
+        check = [(x + 0.22 * size, y + 0.52 * size), (x + 0.42 * size, y + 0.74 * size),
+                 (x + 0.8 * size, y + 0.26 * size)]
+        if item and "id" in item:
+            pad = (self.pitch - size) / 2
+            self.targets.append((len(self.drawn) - 1, x - pad, y - pad, self.pitch, check, 0.018 * scale,
+                                 item["id"], item["key"], item["done"]))
         if item and item["done"]:
-            # Drawn, not typed: DejaVu Serif Bold has no ✓ glyph.
+            # The PDF only: the SVG page draws every target's check itself, so a tap can show or hide it.
             self.set_line_width(0.018 * scale)
-            self.polyline([(x + 0.22 * size, y + 0.52 * size), (x + 0.42 * size, y + 0.74 * size),
-                           (x + 0.8 * size, y + 0.26 * size)])
+            FPDF.polyline(self, check)
             self.set_line_width(0.012)
         if item and item["day"]:
             self.set_font("Body", "", (6.5 if label == "below" else 7.5) * scale)

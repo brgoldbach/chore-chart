@@ -17,7 +17,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, quote, unquote, urlsplit
 
 from schedule import UNIT_DAYS, add_months, calendar_rows, due_sections, duration, parse_month, year_hours
-from sheet import PERSON_COLORS, PRESETS, PRINTOUT_DEFAULTS, clean_options, render
+from sheet import FONT_DIR, FONTS, PERSON_COLORS, PRESETS, PRINTOUT_DEFAULTS, clean_options, render
 
 DATA_DIR = Path(os.environ.get("DATA_DIR", "/data"))
 CHORES_FILE = DATA_DIR / "chores.json"
@@ -27,6 +27,8 @@ DONE_FILE = DATA_DIR / "done.json"
 SETTINGS_FILE = DATA_DIR / "settings.json"
 PRINTOUT_FILE = DATA_DIR / "printout.json"
 INDEX_FILE = Path(__file__).parent / "static" / "index.html"
+# The sheet's fonts, for the browser to draw the SVG page with the same letters as the PDF.
+FONT_ROUTES = {f"/fonts/{name}.ttf": Path(FONT_DIR) / f"{name}.ttf" for names in FONTS.values() for name in names}
 PORT = int(os.environ.get("PORT", 8099))
 QUEUE = "chores"
 MEDIA = {"letter": "na_letter_8.5x11in", "a4": "iso_a4_210x297mm"}
@@ -340,7 +342,8 @@ class Handler(BaseHTTPRequestHandler):
         self.route({"/": self.index, "/api/chores": self.get_chores, "/api/owners": self.get_owners,
                     "/api/daily": self.get_daily, "/api/settings": self.get_settings,
                     "/api/printout": self.get_printout, "/api/printers": self.get_printers, "/api/due": self.get_due,
-                    "/api/year": self.get_year, "/api/export": self.get_export, "/sheet.pdf": self.get_sheet})
+                    "/api/year": self.get_year, "/api/export": self.get_export, "/sheet.pdf": self.get_sheet,
+                    "/api/sheet": self.get_sheet_pages, **{route: self.get_font for route in FONT_ROUTES}})
 
     def do_PUT(self):
         self.route({"/api/chores": self.put_chores, "/api/owners": self.put_owners, "/api/daily": self.put_daily,
@@ -488,6 +491,18 @@ class Handler(BaseHTTPRequestHandler):
         sheet.output()
         self.send_json(200, {"title": sheet.heading, "pages": sheet.pages_count, "fitted": sheet.fitted, "daily": daily,
                              "sections": sections})
+
+    def get_sheet_pages(self, query):
+        month = month_param(query)
+        printout = load_printout()
+        sheet = render(month, sections_for(month), load_daily(), load_settings()["paper_size"], printout["options"],
+                       printout["colors"])
+        sheet.output()  # releases the font files
+        self.send_json(200, {"pages": sheet.svg_pages(), "fitted": sheet.fitted})
+
+    def get_font(self, query):
+        self.send(200, "font/ttf", FONT_ROUTES[urlsplit(self.path).path].read_bytes(),
+                  {"Cache-Control": "max-age=86400"})
 
     def get_year(self, query):
         chores, owners = load_chores(), load_owners()

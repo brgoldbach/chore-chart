@@ -15,6 +15,15 @@
       --line: #33363b; --accent: #29b6f6; --on-accent: #0b1a22; --danger: #ef5350;
     }
   }
+  @font-face { font-family: "DejaVu Sans"; src: url(fonts/DejaVuSans.ttf); }
+  @font-face { font-family: "DejaVu Sans"; font-weight: bold; src: url(fonts/DejaVuSans-Bold.ttf); }
+  @font-face { font-family: "DejaVu Sans"; font-style: italic; src: url(fonts/DejaVuSans-Oblique.ttf); }
+  @font-face { font-family: "DejaVu Serif"; src: url(fonts/DejaVuSerif.ttf); }
+  @font-face { font-family: "DejaVu Serif"; font-weight: bold; src: url(fonts/DejaVuSerif-Bold.ttf); }
+  @font-face { font-family: "DejaVu Serif"; font-style: italic; src: url(fonts/DejaVuSerif-Italic.ttf); }
+  @font-face { font-family: "DejaVu Sans Condensed"; src: url(fonts/DejaVuSansCondensed.ttf); }
+  @font-face { font-family: "DejaVu Sans Condensed"; font-weight: bold; src: url(fonts/DejaVuSansCondensed-Bold.ttf); }
+  @font-face { font-family: "DejaVu Sans Condensed"; font-style: italic; src: url(fonts/DejaVuSansCondensed-Oblique.ttf); }
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
   body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.4 system-ui, sans-serif; }
@@ -61,6 +70,10 @@
     font-size: 10px; font-weight: 400; color: var(--muted);
   }
 
+  .sheet-page svg { display: block; width: 100%; max-width: 816px; height: auto; margin: 0 auto 16px;
+    box-shadow: 0 1px 4px rgb(0 0 0 / 0.3); }
+  .sheet-page .target { cursor: pointer; }
+  .sheet-page .target:hover rect { fill: rgb(0 0 0 / 0.08); }
   .scroll { overflow-x: auto; }
   .grid { border-collapse: collapse; font-size: 13px; }
   .grid th, .grid td { padding: 6px 8px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--line); }
@@ -142,12 +155,21 @@
   </div>
 
   <section class="panel card sheet" id="tab-sheet">
-    <h1 id="sheet-title"></h1>
+    <div class="bar heading-bar">
+      <h1 id="sheet-title"></h1>
+      <span class="segmented">
+        <button type="button" data-sheet-view="page" aria-pressed="true">Page</button>
+        <button type="button" data-sheet-view="list" aria-pressed="false">List</button>
+      </span>
+    </div>
     <p id="warning" class="error" hidden></p>
     <p id="fitted" class="hint" hidden></p>
-    <div id="sheet-daily" class="section" hidden><h3>Daily</h3><ul id="daily-list" class="daily"></ul></div>
-    <div id="sheet-sections"></div>
-    <p id="sheet-empty" class="hint" hidden>No chores due this month.</p>
+    <div id="sheet-page" class="sheet-page"></div>
+    <div id="sheet-list" hidden>
+      <div id="sheet-daily" class="section" hidden><h3>Daily</h3><ul id="daily-list" class="daily"></ul></div>
+      <div id="sheet-sections"></div>
+      <p id="sheet-empty" class="hint" hidden>No chores due this month.</p>
+    </div>
     <p class="hint">Tap a box to check it off here. The paper sheet works without this.</p>
   </section>
 
@@ -483,8 +505,50 @@ function sheetSection(section) {
   return el("div", { className: "section" }, el("h3", { textContent: section.label }), el("table", {}, ...rows));
 }
 
+// Page shows the printed sheet itself, drawn as SVG; List is the reflowing view for small screens.
+let sheetView = "page";
+
+function showSheetView(view) {
+  sheetView = view;
+  for (const button of document.querySelectorAll("[data-sheet-view]")) {
+    button.setAttribute("aria-pressed", button.dataset.sheetView === view);
+  }
+  $("sheet-page").hidden = view !== "page";
+  $("sheet-list").hidden = view !== "list";
+  refreshSheet();
+}
+
+async function refreshSheetPage() {
+  const sheet = await api(`api/sheet?month=${month()}`);
+  $("sheet-page").innerHTML = sheet.pages.join("");
+}
+
+// A tap shows the change at once and saves it in the background; a failed save takes it back.
+$("sheet-page").addEventListener("click", async (event) => {
+  const target = event.target.closest(".target");
+  if (!target) return;
+  const show = (done) => {
+    target.dataset.done = done;
+    target.querySelector(".check").setAttribute("visibility", done ? "visible" : "hidden");
+  };
+  const done = target.dataset.done !== "true";
+  show(done);
+  try {
+    await api("api/done", { method: "POST", headers: JSON_HEADERS,
+      body: JSON.stringify({ id: target.dataset.id, key: target.dataset.key, done }) });
+  } catch (error) {
+    show(!done);
+    setStatus(`Check-off failed: ${error.message}`, true);
+  }
+});
+
+for (const button of document.querySelectorAll("[data-sheet-view]")) {
+  button.addEventListener("click", () => showSheetView(button.dataset.sheetView));
+}
+
 async function refreshSheet() {
   $("open").href = $("preview").href = `sheet.pdf?month=${month()}`;
+  if (sheetView === "page") refreshSheetPage();
   const due = await api(`api/due?month=${month()}`);
   // The printout keeps empty sections for write-ins; the screen leaves them out.
   const sections = due.sections.filter((section) => section.rows.length);

@@ -154,6 +154,26 @@ class CleanOptionsTest(unittest.TestCase):
                 clean_options(changes)
 
 
+class SvgTest(unittest.TestCase):
+    def test_a_target_for_each_chore_box_with_its_check_state(self):
+        # 4 Laundry dates and Windows for Bruno, one chore for Bella; write-in boxes get no target.
+        sections = [section("Bruno", rows=[row("Laundry", dates=4, done=True), row("Windows")]), section("Bella", 1)]
+        page = rendered(sections).svg_pages()[0]
+        self.assertEqual(page.count('class="target"'), 6)
+        self.assertEqual(page.count('data-done="true"'), 4)
+        self.assertEqual(page.count('visibility="visible"'), 4)
+        self.assertIn(">Laundry</text>", page)
+
+    def test_an_svg_page_for_each_pdf_page(self):
+        sheet = rendered(household(40), fit_page=False)
+        self.assertEqual(len(sheet.svg_pages()), sheet.pages_count)
+
+    def test_names_are_escaped(self):
+        page = rendered([section("Bruno", rows=[row("Mop & <wax>")])]).svg_pages()[0]
+        self.assertIn(">Mop &amp; &lt;wax&gt;</text>", page)
+        self.assertNotIn("<wax>", page)
+
+
 class CornerTest(unittest.TestCase):
     def test_corner_shapes_mirror_but_upright_ones_move(self):
         # A stem above the center: mirrored into the bottom-right corner it points down; upright it stays on top.
