@@ -10,6 +10,8 @@ on the diagonal and mirror onto themselves, so all four corners point inward.
 A shape can carry a fourth item, a pivot point (see upright()). The sheet
 then moves it to the mirrored spot without flipping it, so faces and figures
 stay upright in every corner.
+
+Related Documentation: DOCS.md ("The sheet").
 """
 
 from datetime import date
@@ -290,7 +292,11 @@ THEMES = {name: build() for name, build in (("spring", spring), ("summer", summe
                                             ("winter", winter), ("easter", easter), ("july4", july4),
                                             ("halloween", halloween), ("thanksgiving", thanksgiving),
                                             ("christmas", christmas))}
-SEASONS = {1: "winter", 2: "winter", 3: "spring", 4: "spring", 5: "spring", 6: "summer", 7: "summer",
+# Each theme's text color for titles and headings: a motif color, darkened to read on white.
+ACCENTS = {"spring": (80, 120, 76), "summer": (36, 118, 140), "fall": (176, 82, 36), "winter": (52, 96, 148),
+           "easter": (122, 92, 164), "july4": (44, 70, 140), "halloween": (196, 92, 22),
+           "thanksgiving": (160, 92, 40), "christmas": (170, 40, 40)}
+SEASONS ={1: "winter", 2: "winter", 3: "spring", 4: "spring", 5: "spring", 6: "summer", 7: "summer",
            8: "summer", 9: "fall", 10: "fall", 11: "fall", 12: "winter"}
 HOLIDAYS = {7: "july4", 10: "halloween", 11: "thanksgiving", 12: "christmas"}
 

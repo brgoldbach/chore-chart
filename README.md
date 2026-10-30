@@ -11,10 +11,15 @@ A Home Assistant app for household chores. Keep the chore list in Home Assistant
 - Chores that repeat every N weeks, months, or years, aligned to any month. Week chores can fall on a set weekday.
 - Owners who take turns, or share a chore with the time split evenly.
 - Optional time estimates, seasons (for example April to October), and notes.
-- A printable sheet: one section per owner, blank rows for write-ins, and corner decorations for each season and for Easter, the 4th of July, Halloween, Thanksgiving, and Christmas.
+- A printable sheet in two styles: Cards (a card per person) or Week grid (a column per week).
+- Built-in layouts, and your own saved ones: text size, a color you pick for each person, box style, landscape, a custom title, and more.
+- Fit to one page: a full month gives up write-in lines, then smaller text, before it runs onto page 2.
+- Corner decorations for each season and for Easter, the 4th of July, Halloween, Thanksgiving, and Christmas.
 - On-screen check-off, a year view of each person's hours, and a chore calendar.
 - Printer search (AirPrint, IPP Everywhere, Mopria) and auto-print on the 1st of each month.
 - Export and import of all chores as a JSON file.
+
+The app is built around the printed sheet. Notifications, owners linked to Home Assistant users, and entities for dashboards are possible future work.
 
 ## Install
 

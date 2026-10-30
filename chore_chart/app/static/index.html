@@ -86,11 +86,13 @@
   .chore-item:hover { background: var(--band); }
   .meta { display: block; color: var(--muted); font-size: 13px; }
 
-  .list-editor { display: grid; gap: 6px; margin-bottom: 12px; max-width: 32rem; }
+  .list-editor { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; margin-bottom: 12px; max-width: 32rem; }
   .list-editor:empty::before { content: attr(data-empty); color: var(--muted); }
   .list-row { display: flex; gap: 4px; }
-  .list-row input { flex: 1; }
+  .list-row input { flex: 1; width: 0; }
   .list-row button { padding: 6px 9px; }
+  .swatch { flex: none; align-self: center; width: 14px; height: 14px; border-radius: 50%; border: 1px dashed var(--muted); }
+  .swatch.chosen { border: 0; }
   .filters input[type="search"] { flex: 1 1 12rem; }
   #chore-count { margin: 8px 0 4px; }
   .daily { columns: 3 12rem; margin: 4px 0 8px; padding-left: 24px; }
@@ -108,6 +110,7 @@
   .pair { display: flex; align-items: center; gap: 8px; }
   .pair > * { flex: 1; width: 0; }
   .pair > input[type="number"] { flex: 0 0 4.5rem; }
+  .checks { display: grid; gap: 6px; }
   .people { display: flex; flex-wrap: wrap; gap: 4px 16px; }
   .people:empty::before { content: "Add owners in Settings."; color: var(--muted); }
   .mode { display: grid; gap: 6px; }
@@ -141,6 +144,7 @@
   <section class="panel card sheet" id="tab-sheet">
     <h1 id="sheet-title"></h1>
     <p id="warning" class="error" hidden></p>
+    <p id="fitted" class="hint" hidden></p>
     <div id="sheet-daily" class="section" hidden><h3>Daily</h3><ul id="daily-list" class="daily"></ul></div>
     <div id="sheet-sections"></div>
     <p id="sheet-empty" class="hint" hidden>No chores due this month.</p>
@@ -207,7 +211,7 @@
         <input id="owner-name" placeholder="Name" aria-label="New owner" required>
         <button>Add owner</button>
       </form>
-      <p class="hint">Edit a name to rename the person on all their chores.</p>
+      <p class="hint">Edit a name to rename the person on all their chores. The color shows on the printout when Printout → Color is By person; Automatic picks one no one else has.</p>
     </div>
     <div class="card">
       <h2>Printer</h2>
@@ -224,6 +228,88 @@
       <label class="field">Paper size
         <select id="paper-size"><option value="letter">Letter</option><option value="a4">A4</option></select>
       </label>
+    </div>
+    <div class="card">
+      <h2>Printout</h2>
+      <label class="field">Layout <select id="layout"></select></label>
+      <div class="bar">
+        <button type="button" id="layout-save">Save as…</button>
+        <button type="button" id="layout-delete" class="delete">Delete</button>
+        <span class="spacer"></span>
+        <a id="preview" class="button" target="_blank">Preview</a>
+      </div>
+      <label class="field">Style
+        <select data-option="style"><option value="cards">Cards</option><option value="grid">Week grid</option></select>
+      </label>
+      <label class="field">Write-in lines
+        <select data-option="write_in_lines" data-type="number">
+          <option>0</option><option>1</option><option>2</option><option>3</option><option>4</option>
+        </select>
+      </label>
+      <div class="field"><span></span>
+        <label><input type="checkbox" data-option="fit_page"> Fit to one page</label>
+      </div>
+      <details>
+        <summary>More options</summary>
+        <label class="field">Orientation
+          <select data-option="orientation"><option value="portrait">Portrait</option><option value="landscape">Landscape</option></select>
+        </label>
+        <label class="field" data-style="cards">Cards per row
+          <select data-option="cards_per_row" data-type="number"><option>1</option><option>2</option><option>3</option></select>
+        </label>
+        <label class="field">Text size
+          <select data-option="text_size">
+            <option value="small">Small</option><option value="normal">Normal</option><option value="large">Large</option>
+          </select>
+        </label>
+        <label class="field">Font
+          <select data-option="font">
+            <option value="sans">Sans</option><option value="serif">Serif</option><option value="condensed">Condensed</option>
+          </select>
+        </label>
+        <label class="field">Boxes
+          <select data-option="box_style">
+            <option value="rounded">Rounded</option><option value="square">Square</option><option value="circle">Circle</option>
+          </select>
+        </label>
+        <label class="field">Color
+          <select data-option="color">
+            <option value="theme">Theme</option><option value="person">By person</option><option value="gray">Black and white</option>
+          </select>
+        </label>
+        <label class="field">Decoration
+          <select data-option="decoration">
+            <option value="auto">Automatic by month</option><option value="none">None</option>
+            <optgroup label="The same all year">
+              <option value="spring">Spring</option><option value="summer">Summer</option><option value="fall">Fall</option>
+              <option value="winter">Winter</option><option value="easter">Easter</option><option value="july4">4th of July</option>
+              <option value="halloween">Halloween</option><option value="thanksgiving">Thanksgiving</option>
+              <option value="christmas">Christmas</option>
+            </optgroup>
+          </select>
+        </label>
+        <div class="field"><span>Look</span>
+          <div class="checks">
+            <label><input type="checkbox" data-option="frames"> Card frames and tinted headings</label>
+            <label><input type="checkbox" data-option="shading"> Shade alternate rows</label>
+          </div>
+        </div>
+        <label class="field">Custom title <input data-option="title" maxlength="40" placeholder="Optional, e.g. The Garcia House"></label>
+        <label class="field">Daily list
+          <select data-option="daily">
+            <option value="top">Top</option><option value="bottom">Bottom</option><option value="hidden">Hidden</option>
+          </select>
+        </label>
+        <div class="field"><span>Show</span>
+          <div class="checks">
+            <label><input type="checkbox" data-option="show_times"> Times in headings</label>
+            <label><input type="checkbox" data-option="show_empty"> People with no chores this month</label>
+            <label><input type="checkbox" data-option="extra"> Extra section</label>
+            <label id="extra-who-row"><input type="checkbox" data-option="extra_who"> "Who" line on Extra rows</label>
+          </div>
+        </div>
+      </details>
+      <p class="hint">A layout is a set of these options. Change any of them, then use Save as to keep your own.</p>
     </div>
     <div class="card">
       <h2>Auto-print</h2>
@@ -316,6 +402,9 @@ let chores = [];
 let owners = [];
 let daily = [];
 let settings = {};
+let printout = { options: {}, saved: [], presets: {} };
+// The layout the selector shows: "preset:Name", "saved:Name", or "" for options that match no layout.
+let layoutKey = "";
 let year = null;
 let editing = null;
 
@@ -395,7 +484,7 @@ function sheetSection(section) {
 }
 
 async function refreshSheet() {
-  $("open").href = `sheet.pdf?month=${month()}`;
+  $("open").href = $("preview").href = `sheet.pdf?month=${month()}`;
   const due = await api(`api/due?month=${month()}`);
   // The printout keeps empty sections for write-ins; the screen leaves them out.
   const sections = due.sections.filter((section) => section.rows.length);
@@ -406,6 +495,8 @@ async function refreshSheet() {
   $("sheet-empty").hidden = sections.length > 0;
   $("warning").hidden = due.pages === 1;
   $("warning").textContent = `Too many chores for one page: the sheet runs to ${due.pages} pages.`;
+  $("fitted").hidden = due.fitted.length === 0;
+  $("fitted").textContent = `To fit one page, the printout has ${due.fitted.join(", ")}.`;
 }
 
 async function refreshYear() {
@@ -655,18 +746,36 @@ $("f-season-from").addEventListener("change", syncSeason);
 $("f-unit").addEventListener("change", syncUnit);
 $("add").addEventListener("click", () => openChore(null));
 
-function listEditor(container, items, { label, rename, save }) {
+function listEditor(container, items, { label, rename, save, extra = () => [] }) {
   container.replaceChildren(...items.map((item, index) => {
     const input = el("input", { value: item, maxLength: 80, ariaLabel: `${label}: ${item}`,
       onchange: () => rename(index, input.value) });
-    return el("div", { className: "list-row" }, input,
+    return el("div", { className: "list-row" }, ...extra(item), input,
       el("button", { type: "button", className: "delete", textContent: "✕", ariaLabel: `Remove ${item}`,
         onclick: () => save(items.filter((_, other) => other !== index)) }));
   }));
 }
 
 function renderOwners() {
-  listEditor($("owners"), owners, { label: "Owner", save: saveOwners, rename: renameOwner });
+  listEditor($("owners"), owners, { label: "Owner", save: saveOwners, rename: renameOwner, extra: colorPicker });
+}
+
+function colorPicker(name) {
+  const capitalized = (text) => text[0].toUpperCase() + text.slice(1);
+  const select = el("select", { ariaLabel: `Printout color for ${name}` },
+    el("option", { value: "", textContent: "Automatic" }),
+    ...Object.keys(printout.palette).map((color) => el("option", { value: color, textContent: capitalized(color) })));
+  select.value = printout.colors[name] || "";
+  const swatch = el("span", { className: `swatch${select.value ? " chosen" : ""}` });
+  swatch.style.background = printout.palette[select.value] || "none";
+  select.addEventListener("change", async () => {
+    const colors = { ...printout.colors };
+    if (select.value) colors[name] = select.value;
+    else delete colors[name];
+    await savePrintout({ colors });
+    renderOwners();
+  });
+  return [swatch, select];
 }
 
 function renderDaily() {
@@ -710,8 +819,8 @@ async function saveOwners(next) {
 
 async function renameOwner(index, name) {
   try {
-    ({ owners, chores } = await api("api/owners/rename", { method: "POST", headers: JSON_HEADERS,
-      body: JSON.stringify({ from: owners[index], to: name }) }));
+    ({ owners, chores, colors: printout.colors } = await api("api/owners/rename", { method: "POST",
+      headers: JSON_HEADERS, body: JSON.stringify({ from: owners[index], to: name }) }));
     setStatus("Renamed.");
   } catch (error) {
     setStatus(`Rename failed: ${error.message}`, true);
@@ -772,6 +881,74 @@ $("paper-size").addEventListener("change", async () => {
 $("auto-print").addEventListener("change", () => saveSettings({ auto_print: $("auto-print").checked }));
 $("auto-print-time").addEventListener("change", () => saveSettings({ auto_print_time: $("auto-print-time").value }));
 
+// The server returns every option in the same order, so equal options give equal JSON.
+const sameOptions = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+
+function layoutChoices() {
+  return [...Object.entries(printout.presets).map(([name, options]) => ({ key: `preset:${name}`, name, options })),
+    ...printout.saved.map(({ name, options }) => ({ key: `saved:${name}`, name, options }))];
+}
+
+function renderPrintout() {
+  const { options } = printout;
+  const choices = layoutChoices();
+  const shown = choices.find((choice) => choice.key === layoutKey && sameOptions(choice.options, options))
+    || choices.find((choice) => sameOptions(choice.options, options));
+  layoutKey = shown ? shown.key : "";
+  const group = (label, prefix) => el("optgroup", { label }, ...choices.filter((choice) => choice.key.startsWith(prefix))
+    .map((choice) => el("option", { value: choice.key, textContent: choice.name })));
+  $("layout").replaceChildren(...(shown ? [] : [el("option", { value: "", textContent: "Custom (not saved)" })]),
+    group("Built in", "preset:"), ...(printout.saved.length ? [group("Yours", "saved:")] : []));
+  $("layout").value = layoutKey;
+  $("layout-delete").hidden = !layoutKey.startsWith("saved:");
+  for (const control of document.querySelectorAll("[data-option]")) {
+    const value = options[control.dataset.option];
+    if (control.type === "checkbox") control.checked = value;
+    else control.value = String(value);
+  }
+  for (const row of document.querySelectorAll("[data-style]")) row.hidden = row.dataset.style !== options.style;
+  $("extra-who-row").hidden = !options.extra;
+}
+
+async function savePrintout(changes) {
+  try {
+    printout = await api("api/printout", { method: "PUT", headers: JSON_HEADERS, body: JSON.stringify(changes) });
+    setStatus("Saved.");
+  } catch (error) {
+    setStatus(`Save failed: ${error.message}`, true);
+  }
+  renderPrintout();
+  refreshSheet();
+}
+
+$("layout").addEventListener("change", () => {
+  const choice = layoutChoices().find((item) => item.key === $("layout").value);
+  layoutKey = choice.key;
+  savePrintout({ options: choice.options });
+});
+for (const control of document.querySelectorAll("[data-option]")) {
+  control.addEventListener("change", () => {
+    const value = control.type === "checkbox" ? control.checked
+      : control.dataset.type === "number" ? Number(control.value) : control.value;
+    savePrintout({ options: { [control.dataset.option]: value } });
+  });
+}
+$("layout-save").addEventListener("click", () => {
+  const name = prompt("Name for this layout:", layoutKey.startsWith("saved:") ? layoutKey.slice(6) : "")?.trim();
+  if (!name) return;
+  const index = printout.saved.findIndex((layout) => layout.name.toLowerCase() === name.toLowerCase());
+  if (index >= 0 && !confirm(`Replace your layout "${printout.saved[index].name}"?`)) return;
+  const saved = [...printout.saved];
+  saved.splice(index >= 0 ? index : saved.length, index >= 0 ? 1 : 0, { name, options: printout.options });
+  layoutKey = `saved:${name}`;
+  savePrintout({ saved });
+});
+$("layout-delete").addEventListener("click", () => {
+  const name = layoutKey.slice(6);
+  if (!confirm(`Delete your layout "${name}"?`)) return;
+  savePrintout({ saved: printout.saved.filter((layout) => layout.name !== name) });
+});
+
 $("import-file").addEventListener("change", async () => {
   const file = $("import-file").files[0];
   $("import-file").value = "";
@@ -788,10 +965,13 @@ $("import-file").addEventListener("change", async () => {
   const hasDaily = Array.isArray(data.daily);
   if (!confirm(`Replace your ${chores.length} chores, ${owners.length} owners`
     + `${hasDaily ? `, and ${daily.length} daily chores` : ""} with the file's ${count(data.chores)} chores, `
-    + `${count(data.owners)} owners${hasDaily ? `, and ${data.daily.length} daily chores` : ""}?`)) return;
+    + `${count(data.owners)} owners${hasDaily ? `, and ${data.daily.length} daily chores` : ""}?`
+    + `${data.printout ? " Your printout options and saved layouts also change to the file's." : ""}`)) return;
   try {
-    ({ owners, daily, chores } = await api("api/import", { method: "POST", headers: JSON_HEADERS,
+    let imported;
+    ({ owners, daily, chores, printout: imported } = await api("api/import", { method: "POST", headers: JSON_HEADERS,
       body: JSON.stringify(data) }));
+    printout = { ...imported, presets: printout.presets, palette: printout.palette };
   } catch (error) {
     setStatus(`Import failed: ${error.message}`, true);
     return;
@@ -800,6 +980,7 @@ $("import-file").addEventListener("change", async () => {
   renderOwners();
   renderDaily();
   renderChores();
+  renderPrintout();
   refreshViews();
 });
 
@@ -820,12 +1001,13 @@ for (const tab of document.querySelectorAll("[data-tab]")) {
 $("month").value = currentMonth();
 $("month").addEventListener("change", refreshViews);
 showYearView("hours");
-[owners, daily, chores, settings] = await Promise.all(
-  [api("api/owners"), api("api/daily"), api("api/chores"), api("api/settings")]);
+[owners, daily, chores, settings, printout] = await Promise.all(
+  [api("api/owners"), api("api/daily"), api("api/chores"), api("api/settings"), api("api/printout")]);
 renderOwners();
 renderDaily();
 renderChores();
 renderSettings();
+renderPrintout();
 refreshViews();
 </script>
 </body>

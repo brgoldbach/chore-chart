@@ -1,4 +1,7 @@
-"""Chore chart server: UI, storage, sheet rendering, printing, and auto-print."""
+"""Chore chart server: UI, storage, sheet rendering, printing, and auto-print.
+
+Related Documentation: DOCS.md ("Backup", "Data").
+"""
 
 import json
 import os
@@ -14,7 +17,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, quote, unquote, urlsplit
 
 from schedule import UNIT_DAYS, add_months, calendar_rows, due_sections, duration, parse_month, year_hours
-from sheet import render
+from sheet import PERSON_COLORS, PRESETS, PRINTOUT_DEFAULTS, clean_options, render
 
 DATA_DIR = Path(os.environ.get("DATA_DIR", "/data"))
 CHORES_FILE = DATA_DIR / "chores.json"
@@ -22,13 +25,15 @@ OWNERS_FILE = DATA_DIR / "owners.json"
 DAILY_FILE = DATA_DIR / "daily.json"
 DONE_FILE = DATA_DIR / "done.json"
 SETTINGS_FILE = DATA_DIR / "settings.json"
+PRINTOUT_FILE = DATA_DIR / "printout.json"
 INDEX_FILE = Path(__file__).parent / "static" / "index.html"
 PORT = int(os.environ.get("PORT", 8099))
 QUEUE = "chores"
 MEDIA = {"letter": "na_letter_8.5x11in", "a4": "iso_a4_210x297mm"}
 MONTH_PATTERN = re.compile(r"\d{4}-(0[1-9]|1[0-2])")
 TIME_PATTERN = re.compile(r"([01]\d|2[0-3]):[0-5]\d")
-EXPORT_VERSION = 4
+EXPORT_VERSION = 5
+LAYOUT_NAME_MAX = 30
 # Every chore field added after the first release needs a default here, so older files still load.
 CHORE_DEFAULTS = {"minutes": None, "season": None, "note": "", "shared": False, "weekday": None}
 DEFAULT_SETTINGS = {"printer_name": "", "printer_uri": "", "paper_size": "letter",
@@ -85,6 +90,57 @@ def load_daily():
 
 def load_settings():
     return {**DEFAULT_SETTINGS, **load_json(SETTINGS_FILE, {})}
+
+
+def load_printout():
+    """Return {"options", "saved", "colors"}: the printout options, the saved layouts, and each person's color.
+
+    Options and saved layouts have every option filled in. `colors` maps owner names to PERSON_COLORS names.
+    """
+    stored = load_json(PRINTOUT_FILE, {})
+
+    def known(options):
+        # An option that a later version removed is dropped, so its old files still load.
+        return clean_options({name: value for name, value in options.items() if name in PRINTOUT_DEFAULTS})
+
+    return {"options": known(stored.get("options", {})),
+            "saved": [{"name": layout["name"], "options": known(layout["options"])}
+                      for layout in stored.get("saved", [])],
+            "colors": {name: color for name, color in stored.get("colors", {}).items() if color in PERSON_COLORS}}
+
+
+def validate_printout(changes, current, owners):
+    """Return `current` with `changes` applied: new "options" merge in; new "saved" and "colors" replace.
+
+    Colors of people who are not in `owners` drop out.
+    """
+    if not isinstance(changes, dict) or not set(changes) <= {"options", "saved", "colors"}:
+        raise BadRequest("Invalid printout.")
+    options, saved = changes.get("options", {}), changes.get("saved", current["saved"])
+    colors = changes.get("colors", current["colors"])
+    if (not isinstance(options, dict) or not isinstance(saved, list) or not isinstance(colors, dict)
+            or not all(isinstance(layout, dict) and set(layout) == {"name", "options"} for layout in saved)):
+        raise BadRequest("Invalid printout.")
+    if not all(color in PERSON_COLORS for color in colors.values()):
+        raise BadRequest("Unknown color.")
+    try:
+        options = clean_options({**current["options"], **options})
+        saved = [{"name": layout["name"], "options": clean_options(layout["options"])} for layout in saved]
+    except ValueError as error:
+        raise BadRequest(str(error))
+    names = clean_names([layout["name"] for layout in saved], "layout names")
+    if any(len(name) > LAYOUT_NAME_MAX for name in names):
+        raise BadRequest(f"A layout name can have at most {LAYOUT_NAME_MAX} characters.")
+    if {name.lower() for name in names} & {name.lower() for name in PRESETS}:
+        raise BadRequest("A built-in layout already has that name.")
+    return {"options": options, "saved": [{**layout, "name": name} for layout, name in zip(saved, names)],
+            "colors": {name: color for name, color in colors.items() if name in owners}}
+
+
+def printout_reply(printout):
+    """Return `printout` with what the Printout card shows beside it: the built-in layouts and the color names."""
+    palette = {name: "#%02x%02x%02x" % color for name, color in PERSON_COLORS.items()}
+    return {**printout, "presets": PRESETS, "palette": palette}
 
 
 def clean_names(names, label):
@@ -186,7 +242,9 @@ def sections_for(month):
 
 
 def render_month(month):
-    return render(month, sections_for(month), load_daily(), load_settings()["paper_size"])
+    printout = load_printout()
+    return render(month, sections_for(month), load_daily(), load_settings()["paper_size"], printout["options"],
+                  printout["colors"])
 
 
 def run(*command):
@@ -281,12 +339,12 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.route({"/": self.index, "/api/chores": self.get_chores, "/api/owners": self.get_owners,
                     "/api/daily": self.get_daily, "/api/settings": self.get_settings,
-                    "/api/printers": self.get_printers, "/api/due": self.get_due, "/api/year": self.get_year,
-                    "/api/export": self.get_export, "/sheet.pdf": self.get_sheet})
+                    "/api/printout": self.get_printout, "/api/printers": self.get_printers, "/api/due": self.get_due,
+                    "/api/year": self.get_year, "/api/export": self.get_export, "/sheet.pdf": self.get_sheet})
 
     def do_PUT(self):
         self.route({"/api/chores": self.put_chores, "/api/owners": self.put_owners, "/api/daily": self.put_daily,
-                    "/api/settings": self.put_settings})
+                    "/api/settings": self.put_settings, "/api/printout": self.put_printout})
 
     def do_POST(self):
         self.route({"/api/print": self.post_print, "/api/done": self.post_done, "/api/import": self.post_import,
@@ -339,7 +397,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send_json(200, chores)
 
     def get_export(self, query):
-        data = {"version": EXPORT_VERSION, "owners": load_owners(), "daily": load_daily(), "chores": load_chores()}
+        data = {"version": EXPORT_VERSION, "owners": load_owners(), "daily": load_daily(), "chores": load_chores(),
+                "printout": load_printout()}
         self.send(200, "application/json", json.dumps(data, indent=2).encode(),
                   {"Content-Disposition": 'attachment; filename="chore-chart.json"'})
 
@@ -349,13 +408,17 @@ class Handler(BaseHTTPRequestHandler):
             raise BadRequest("Expected a file exported from Chore Chart.")
         owners = validate_owners(body.get("owners"), [])
         chores = validate_chores(body.get("chores"), owners)
-        # A file from before the daily list existed leaves the current list as it is.
+        # A file from before the daily list or the printout existed leaves the current one as it is.
         daily = clean_names(body.get("daily", load_daily()), "daily chores")
+        printout = (validate_printout(body["printout"], {"options": PRINTOUT_DEFAULTS, "saved": [], "colors": {}},
+                                      owners)
+                    if "printout" in body else load_printout())
         with save_lock:
             save_json(OWNERS_FILE, owners)
             save_json(DAILY_FILE, daily)
+            save_json(PRINTOUT_FILE, printout)
             save_chores(chores)
-        self.send_json(200, {"owners": owners, "daily": daily, "chores": chores})
+        self.send_json(200, {"owners": owners, "daily": daily, "chores": chores, "printout": printout})
 
     def get_owners(self, query):
         self.send_json(200, load_owners())
@@ -374,10 +437,15 @@ class Handler(BaseHTTPRequestHandler):
         except (KeyError, TypeError):
             raise BadRequest("Expected from and to.")
         with save_lock:
-            owners, chores = rename_owner(load_owners(), load_chores(), old, new)
+            before = load_owners()
+            owners, chores = rename_owner(before, load_chores(), old, new)
+            printout = load_printout()
+            renamed = owners[before.index(old)]
+            printout["colors"] = {renamed if name == old else name: color for name, color in printout["colors"].items()}
             save_json(OWNERS_FILE, owners)
+            save_json(PRINTOUT_FILE, printout)
             save_chores(chores)
-        self.send_json(200, {"owners": owners, "chores": chores})
+        self.send_json(200, {"owners": owners, "chores": chores, "colors": printout["colors"]})
 
     def get_daily(self, query):
         self.send_json(200, load_daily())
@@ -398,16 +466,27 @@ class Handler(BaseHTTPRequestHandler):
             save_json(SETTINGS_FILE, settings)
         self.send_json(200, settings)
 
+    def get_printout(self, query):
+        self.send_json(200, printout_reply(load_printout()))
+
+    def put_printout(self, query):
+        body = self.read_json()
+        with save_lock:
+            printout = validate_printout(body, load_printout(), load_owners())
+            save_json(PRINTOUT_FILE, printout)
+        self.send_json(200, printout_reply(printout))
+
     def get_printers(self, query):
         self.send_json(200, find_printers())
 
     def get_due(self, query):
         month = month_param(query)
         sections, daily = sections_for(month), load_daily()
-        sheet = render(month, sections, daily, load_settings()["paper_size"])
+        printout = load_printout()
+        sheet = render(month, sections, daily, load_settings()["paper_size"], printout["options"], printout["colors"])
         # fpdf2 holds the font files open until output(), so a sheet rendered only for its page count leaks them.
         sheet.output()
-        self.send_json(200, {"title": sheet.heading, "pages": sheet.pages_count, "daily": daily,
+        self.send_json(200, {"title": sheet.heading, "pages": sheet.pages_count, "fitted": sheet.fitted, "daily": daily,
                              "sections": sections})
 
     def get_year(self, query):
