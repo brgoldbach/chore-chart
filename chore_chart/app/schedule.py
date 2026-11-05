@@ -1,14 +1,17 @@
 """Due rules: which chores fall in a month, on which weeks, and for whom.
 
-A chore's `align` month is any month in which it is due. Due dates repeat
-in both directions from it, so months before `align` are due too. Owners
+A chore's `align` month is any month in which it is due. A week chore can
+align to a date ("YYYY-MM-DD") instead; a month there stands for its 1st.
+Due dates repeat in both directions from it, so months before `align` are
+due too. Owners
 take turns per occurrence, counted from the aligned occurrence, so the
 turns need no stored state. A shared chore goes to all its owners at once,
 and its time splits evenly between them.
 
 A week chore falls on its `weekday` (0 is Monday). With no weekday, each
 occurrence stands for the week from Monday. Either way, an occurrence
-belongs to the month that contains its date.
+belongs to the month that contains its date. The first of those days on or
+after the aligned date starts the rhythm.
 """
 
 from collections import Counter
@@ -34,8 +37,13 @@ def months_between(start, month):
     return (month.year - start.year) * 12 + month.month - start.month
 
 
-def first_weekday(month, weekday):
-    return month + timedelta(days=(weekday - month.weekday()) % 7)
+def parse_align(text):
+    """Return the date of a week chore's `align`: "YYYY-MM-DD", or "YYYY-MM" for its 1st."""
+    return date.fromisoformat(text) if len(text) == 10 else parse_month(text)
+
+
+def first_weekday(start, weekday):
+    return start + timedelta(days=(weekday - start.weekday()) % 7)
 
 
 def weekdays_in(month, weekday):
@@ -70,15 +78,14 @@ def occurrences(chore, month):
 
     `key` is the date for week-unit chores, else the month. `day` is that
     date's day of the month, or None. `index` counts intervals from the
-    aligned occurrence (the first one in the aligned month) and is negative
-    before it.
+    aligned occurrence (the first one on or after the aligned date, or in
+    the aligned month) and is negative before it.
     """
     if not in_season(chore, month.month):
         return []
-    align = parse_month(chore["align"])
     if chore["unit"] == "week":
         weekday = 0 if chore["weekday"] is None else chore["weekday"]
-        anchor = first_weekday(align, weekday)
+        anchor = first_weekday(parse_align(chore["align"]), weekday)
         found = []
         for day in weekdays_in(month, weekday):
             weeks = (day - anchor).days // 7
@@ -86,7 +93,7 @@ def occurrences(chore, month):
                 found.append((day.isoformat(), day.day, weeks // chore["every"]))
         return found
     interval = interval_months(chore)
-    elapsed = months_between(align, month)
+    elapsed = months_between(parse_month(chore["align"]), month)
     if elapsed % interval:
         return []
     return [(f"{month:%Y-%m}", None, elapsed // interval)]

@@ -102,6 +102,18 @@ class WeekdayTest(unittest.TestCase):
         self.assertEqual(days_by_owner(mopping, "2026-12"), {"Sam": [1, 15, 29]})
         self.assertEqual(days_by_owner(mopping, "2026-10"), {"Sam": [6, 20]})
 
+    def test_aligned_date_moves_the_rhythm_by_weeks(self):
+        # Thursday Nov 5: the first Tuesday on or after it is Nov 10. A month counts as its 1st.
+        mopping = chore(2, "week", "2026-11-05", weekday=TUESDAY)
+        self.assertEqual(days_by_owner(mopping, "2026-11"), {"Sam": [10, 24]})
+        self.assertEqual(days_by_owner(mopping, "2026-10"), {"Sam": [13, 27]})
+        self.assertEqual(days_by_owner(chore(2, "week", "2026-11-01", weekday=TUESDAY), "2026-11"),
+                         days_by_owner(chore(2, "week", "2026-11", weekday=TUESDAY), "2026-11"))
+
+    def test_turns_start_on_the_aligned_date(self):
+        bathrooms = chore(1, "week", "2026-11-09", owners=("Sam", "Bruno"))
+        self.assertEqual(days_by_owner(bathrooms, "2026-11"), {"Sam": [9, 23], "Bruno": [2, 16, 30]})
+
     def test_key_is_the_date(self):
         row = rows_by_section([chore(1, "week", "2026-11", weekday=TUESDAY)], "2026-11")["Sam"][0]
         self.assertEqual(row["boxes"][0]["key"], "2026-11-03")

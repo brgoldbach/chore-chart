@@ -8,7 +8,7 @@ A Home Assistant app for household chores. Keep the chore list in Home Assistant
 
 ## Features
 
-- Chores that repeat every N weeks, months, or years, aligned to any month. Week chores can fall on a set weekday.
+- Chores that repeat every N weeks, months, or years, aligned to any month. Week chores align to a date, and can fall on a set weekday.
 - Owners who take turns, or share a chore with the time split evenly.
 - Optional time estimates, seasons (for example April to October), and notes.
 - A printable sheet in two styles: Cards (a card per person) or Week grid (a column per week).

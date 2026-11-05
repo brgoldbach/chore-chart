@@ -173,6 +173,13 @@ def rename_owner(owners, chores, old, new):
                      for chore in chores]
 
 
+def is_date(text):
+    try:
+        return date.fromisoformat(text).isoformat() == text
+    except ValueError:
+        return False
+
+
 def validate_chores(chores, owners):
     """Return the chores in stored form. Assign an ID to each new chore."""
     if not isinstance(chores, list):
@@ -195,8 +202,9 @@ def validate_chores(chores, owners):
             raise BadRequest(f"Malformed chore: {raw}")
         name = item["name"] or "unnamed"
         season = item["season"]
+        align = str(item["align"])
         if (not item["name"] or item["every"] < 1 or item["unit"] not in UNIT_DAYS
-                or not MONTH_PATTERN.fullmatch(str(item["align"]))
+                or not (MONTH_PATTERN.fullmatch(align) or item["unit"] == "week" and is_date(align))
                 or (item["minutes"] is not None and item["minutes"] < 0)
                 or (item["weekday"] is not None and not 0 <= item["weekday"] <= 6)
                 or (season and (len(season) != 2 or not all(1 <= month <= 12 for month in season)))):

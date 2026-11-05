@@ -57,13 +57,13 @@ Each chore's summary shows its time per occurrence and its approximate time per 
 |---|---|
 | Chore | What to do. |
 | Owners | Who does it. Check no one for a chore without an owner. |
-| Take turns / Shared | Shows when you check 2 or more people. **Take turns**: each time the chore is due, it goes to the next person. The person in **starting with** does it in the aligned month. **Shared**: everyone checked does it together, and its time splits evenly between them. |
+| Take turns / Shared | Shows when you check 2 or more people. **Take turns**: each time the chore is due, it goes to the next person. The person in **starting with** does it in the aligned month, or on the first date for a week chore. **Shared**: everyone checked does it together, and its time splits evenly between them. |
 | Every | Interval in weeks, months, or years. |
 | Day | Week chores only. The weekday the chore happens on, for example Tuesday, or **Any day**. |
-| Aligned to | Any month in which the chore is due. For a week chore with a day, the first of those days in the aligned month starts the rhythm. |
+| Aligned to | Any month in which the chore is due. A week chore takes a date instead: the first chosen day on or after it starts the rhythm (Monday for **Any day**). To move an every-2-weeks chore by one week, move this date by 7 days. |
 | Minutes | Optional time estimate. The app uses it for each person's load. |
 
-The schedule repeats in both directions from the aligned month. Example: every 3 months aligned to November is due in February, May, August, and November.
+The schedule repeats in both directions from the aligned month or date. Example: every 3 months aligned to November is due in February, May, August, and November.
 
 Under **More**:
 

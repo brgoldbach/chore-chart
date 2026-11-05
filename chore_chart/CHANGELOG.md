@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.2
+
+- Week chores align to a date, not a month. So an every-2-weeks chore can move by one week. Chores you have now keep their dates.
+
 ## 1.1.1
 
 - In the Home Assistant iOS app, the page no longer stays blank until a tap.

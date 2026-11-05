@@ -385,7 +385,7 @@
       </div>
       <label class="field">Note <input id="f-note" maxlength="80" placeholder="Optional"></label>
     </details>
-    <p class="hint">Aligned to: any month the chore is due. Earlier and later months follow the same rhythm.</p>
+    <p class="hint">Aligned to: any month the chore is due. For a week chore, any date it is due. Earlier and later dates follow the same rhythm.</p>
     <p id="f-error" class="error"></p>
     <div class="actions">
       <button type="button" id="f-delete" class="delete">Delete</button>
@@ -448,6 +448,8 @@ function addMonths(text, count) {
 
 const month = () => $("month").value || currentMonth();
 const monthLabel = (text) => `${MONTHS[Number(text.slice(5)) - 1]} ${text.slice(0, 4)}`;
+const alignLabel = (text) => (text.length === 7 ? monthLabel(text)
+  : `${MONTHS[Number(text.slice(5, 7)) - 1]} ${Number(text.slice(8))}, ${text.slice(0, 4)}`);
 
 async function api(path, options) {
   const response = await fetch(path, options);
@@ -665,7 +667,7 @@ function choreSummary(chore) {
   const interval = chore.every === 1 ? chore.unit : `${chore.every} ${chore.unit}s`;
   const day = chore.weekday === null ? "" : ` on ${DAYS[chore.weekday].slice(0, 3)}`;
   const who = chore.owners.join(chore.shared ? " + " : " ⇄ ") || "No owner";
-  const parts = [who, `every ${interval}${day}`, `aligned ${monthLabel(chore.align)}`];
+  const parts = [who, `every ${interval}${day}`, `aligned ${alignLabel(chore.align)}`];
   if (chore.minutes) parts.push(`${chore.minutes} min each`, `≈ ${roughDuration(monthlyMinutes(chore))} a month`);
   if (chore.season) parts.push(chore.season.map((number) => MONTHS[number - 1]).join("–"));
   if (chore.note) parts.push("note");
@@ -734,8 +736,25 @@ function syncSeason() {
   $("f-season-to").disabled = !$("f-season-from").value;
 }
 
+// The first `weekday` (0 is Monday) on or after the 1st, as first_weekday does in schedule.py.
+function firstWeekday(month, weekday) {
+  const day = new Date(`${month}-01T00:00Z`);
+  day.setUTCDate(1 + ((weekday - day.getUTCDay() + 8) % 7));
+  return day.toISOString().slice(0, 10);
+}
+
+// A week chore aligns to a date. A month there becomes its first due day, so a switch keeps the same rhythm.
+function setAlign(value, week) {
+  const weekday = Number($("f-day").value || 0);
+  $("f-align").type = week ? "date" : "month";
+  $("f-align").value = !value ? "" : !week ? value.slice(0, 7)
+    : value.length === 7 ? firstWeekday(value, weekday) : value;
+}
+
 function syncUnit() {
-  $("f-day-row").hidden = $("f-unit").value !== "week";
+  const week = $("f-unit").value === "week";
+  $("f-day-row").hidden = !week;
+  if (week !== ($("f-align").type === "date")) setAlign($("f-align").value, week);
 }
 
 function openChore(chore, values = chore ?? { name: "", owners: [], shared: false, every: 1, unit: "month",
@@ -755,8 +774,8 @@ function openChore(chore, values = chore ?? { name: "", owners: [], shared: fals
   $("f-every").value = values.every;
   $("f-unit").value = values.unit;
   fillSelect($("f-day"), [["", "Any day"], ...DAYS.map((name, index) => [index, name])], values.weekday ?? "");
+  setAlign(values.align, values.unit === "week");
   syncUnit();
-  $("f-align").value = values.align;
   $("f-minutes").value = values.minutes ?? "";
   fillSelect($("f-season-from"), [["", "Any"], ...monthOptions], values.season?.[0] ?? "");
   fillSelect($("f-season-to"), monthOptions, values.season?.[1] ?? 12);

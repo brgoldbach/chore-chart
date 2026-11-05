@@ -77,6 +77,13 @@ class ValidateChoresTest(unittest.TestCase):
         with self.assertRaises(BadRequest):
             validate_chores([chore(unit="week", weekday=7)], [])
 
+    def test_aligned_date_only_for_week_chores(self):
+        self.assertEqual(validate_chores([chore(unit="week", align="2026-11-09")], [])[0]["align"], "2026-11-09")
+        for fields in ({"align": "2026-11-09"}, {"unit": "week", "align": "2026-02-30"},
+                       {"unit": "week", "align": "2026-11-9"}, {"unit": "week", "align": "20261109"}):
+            with self.subTest(fields=fields), self.assertRaises(BadRequest):
+                validate_chores([chore(**fields)], [])
+
     def test_shared_needs_two_owners(self):
         with self.assertRaisesRegex(BadRequest, "shared"):
             validate_chores([chore("Sam", shared=True)], ["Sam"])
