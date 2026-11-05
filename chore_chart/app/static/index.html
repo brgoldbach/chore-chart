@@ -59,6 +59,9 @@
   .every { width: 116px; }
   .every, .note { color: var(--muted); }
   .note { font-size: 13px; }
+  .chore-name { display: block; width: 100%; padding: 0; border: 0; border-radius: 0; background: none; text-align: left; }
+  .chore-name:hover { color: var(--accent); }
+  .chore-name .note { display: block; }
   .box {
     position: relative; width: 22px; height: 22px; padding: 0; margin-right: 6px;
     border: 1.5px solid var(--text); border-radius: 3px; background: none;
@@ -170,7 +173,7 @@
       <div id="sheet-sections"></div>
       <p id="sheet-empty" class="hint" hidden>No chores due this month.</p>
     </div>
-    <p class="hint">Tap a box to check it off here. The paper sheet works without this.</p>
+    <p class="hint">Tap a box to check it off here. In List, tap a chore to edit it. The paper sheet works without this.</p>
   </section>
 
   <section class="panel card" id="tab-year" hidden>
@@ -502,7 +505,9 @@ function boxButton(row, box) {
 function sheetSection(section) {
   const rows = section.rows.map((row) => el("tr", {},
     el("td", { className: "boxes" }, ...row.boxes.map((box) => boxButton(row, box))),
-    el("td", {}, row.name, row.note ? el("div", { className: "note", textContent: row.note }) : ""),
+    el("td", {}, el("button", { type: "button", className: "chore-name",
+      onclick: () => openChore(chores.find((chore) => chore.id === row.id)) },
+    row.name, row.note ? el("span", { className: "note", textContent: row.note }) : "")),
     el("td", { className: "every", textContent: row.every })));
   return el("div", { className: "section" }, el("h3", { textContent: section.label }), el("table", {}, ...rows));
 }
@@ -826,6 +831,23 @@ $("f-delete").addEventListener("click", () => {
 });
 $("f-duplicate").addEventListener("click", () => openChore(null, { ...editing, name: `${editing.name} (copy)` }));
 $("f-cancel").addEventListener("click", () => $("chore-dialog").close());
+
+// A tap on the dimmed area cancels. The press must also start there, so a text selection
+// dragged past the edge does not close it.
+function closeOnOutsideTap(dialog) {
+  const outside = (event) => {
+    const box = dialog.getBoundingClientRect();
+    return event.target === dialog && (event.clientX < box.left || event.clientX > box.right
+      || event.clientY < box.top || event.clientY > box.bottom);
+  };
+  let pressedOutside = false;
+  dialog.addEventListener("pointerdown", (event) => { pressedOutside = outside(event); });
+  dialog.addEventListener("click", (event) => {
+    if (pressedOutside && outside(event)) dialog.close();
+  });
+}
+
+closeOnOutsideTap($("chore-dialog"));
 $("f-turns").addEventListener("change", syncMode);
 $("f-shared").addEventListener("change", syncMode);
 $("f-season-from").addEventListener("change", syncSeason);

@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.3
+
+- On the Sheet tab, in List, a tap on a chore's name opens it for editing.
+- A tap outside the chore form cancels it.
+
 ## 1.1.2
 
 - Week chores align to a date, not a month. So an every-2-weeks chore can move by one week. Chores you have now keep their dates.
