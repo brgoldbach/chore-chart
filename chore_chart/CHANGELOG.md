@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.1
+
+- In the Home Assistant iOS app, the page no longer stays blank until a tap.
+
 ## 1.1.0
 
 - New printout in two styles: Cards (a card for each person) and Week grid (a column for each week).
